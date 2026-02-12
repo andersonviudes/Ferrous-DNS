@@ -1,4 +1,7 @@
-name: Pull Request Validation
+# ============================================================================
+# Validação de Pull Requests - Conventional Commits + Quality Checks
+# ============================================================================
+name: PR Validation
 
 on:
   pull_request:
@@ -10,15 +13,18 @@ permissions:
   pull-requests: write
   issues: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   # ============================================================================
-  # Validate PR Title (Conventional Commits)
+  # Validar Título do PR (Conventional Commits)
   # ============================================================================
   validate-title:
-    name: Validate PR Title
+    name: Validar Título do PR
     runs-on: ubuntu-latest
     steps:
-      - name: Check PR title
+      - name: Verificar título do PR
         uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,10 +43,10 @@ jobs:
           requireScope: false
 
   # ============================================================================
-  # Check for Breaking Changes
+  # Detectar Breaking Changes
   # ============================================================================
   breaking-changes:
-    name: Check for Breaking Changes
+    name: Detectar Breaking Changes
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,7 +54,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for breaking changes indicator
+      - name: Verificar indicador de breaking changes
         id: breaking
         run: |
           if git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }} | grep -q "BREAKING CHANGE"; then
@@ -57,28 +63,28 @@ jobs:
             echo "has_breaking=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Comment on PR if breaking changes detected
+      - name: Comentar no PR se breaking changes detectadas
         if: steps.breaking.outputs.has_breaking == 'true'
         uses: peter-evans/create-or-update-comment@v3
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ## ⚠️ Breaking Changes Detected
+            ## ⚠️ Breaking Changes Detectadas
 
-            This PR contains breaking changes. Please ensure:
-            - [ ] CHANGELOG.md is updated
-            - [ ] Migration guide is provided (if needed)
-            - [ ] Documentation is updated
-            - [ ] Version bump will be MAJOR
+            Este PR contém mudanças que quebram compatibilidade. Por favor, certifique-se de:
+            - [ ] CHANGELOG.md foi atualizado
+            - [ ] Guia de migração fornecido (se necessário)
+            - [ ] Documentação foi atualizada
+            - [ ] Version bump será MAJOR (semver)
 
   # ============================================================================
-  # Size Label
+  # Label de Tamanho do PR
   # ============================================================================
   size-label:
-    name: Size Label
+    name: Label de Tamanho
     runs-on: ubuntu-latest
     steps:
-      - name: Add size label
+      - name: Adicionar label de tamanho
         uses: codelytv/pr-size-labeler@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,41 +100,43 @@ jobs:
           fail_if_xl: false
 
   # ============================================================================
-  # Check for TODO/FIXME
+  # Verificar TODO/FIXME
   # ============================================================================
   check-todos:
-    name: Check for TODO/FIXME
+    name: Verificar TODO/FIXME
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Check for TODO/FIXME
+      - name: Procurar novos TODO/FIXME
         run: |
           if git diff origin/${{ github.base_ref }}..HEAD | grep -E '^\+.*TODO|FIXME'; then
-            echo "::warning::New TODO or FIXME comments found in this PR"
-            echo "Consider creating issues for these items"
+            echo "::warning::Novos comentários TODO ou FIXME encontrados neste PR"
+            echo "Considere criar issues para estes itens"
           fi
         continue-on-error: true
 
   # ============================================================================
-  # Suggest Reviewers
+  # Sugerir Revisores
   # ============================================================================
   suggest-reviewers:
-    name: Suggest Reviewers
+    name: Sugerir Revisores
     runs-on: ubuntu-latest
     steps:
-      - name: Suggest reviewers
+      - name: Auto-assign reviewers
         uses: kentaro-m/auto-assign-action@v1.2.5
         with:
           configuration-path: '.github/auto-assign.yml'
         continue-on-error: true
 
   # ============================================================================
-  # Check Documentation
+  # Verificar Documentação
   # ============================================================================
   check-docs:
-    name: Check Documentation
+    name: Verificar Documentação
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -137,41 +145,54 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check documentation
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-docs-
+
+      - name: Verificar documentação
         run: cargo doc --no-deps --all-features --workspace
         env:
           RUSTDOCFLAGS: "-D warnings"
 
   # ============================================================================
-  # PR Summary
+  # Resumo da Validação
   # ============================================================================
   pr-summary:
-    name: PR Summary
+    name: Resumo da Validação
     runs-on: ubuntu-latest
     needs: [validate-title, check-docs]
+    if: always()
     steps:
-      - name: Create PR summary comment
+      - name: Criar comentário de resumo
         uses: peter-evans/create-or-update-comment@v3
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ## 📋 PR Validation Summary
+            ## 📋 Resumo da Validação do PR
 
-            ✅ **All validations passed!**
+            ✅ **Validações automáticas concluídas!**
 
-            ### Next Steps:
-            - Wait for CI checks to complete
-            - Address any review comments
-            - Ensure all tests pass
-            - Get approval from maintainers
+            ### Próximos Passos:
+            - Aguardar verificações de CI completarem
+            - Endereçar comentários de revisão
+            - Garantir que todos os testes passem
+            - Obter aprovação dos mantenedores
 
-            ### Merge Checklist:
-            - [ ] All CI checks passed
-            - [ ] Code reviewed and approved
-            - [ ] Documentation updated
-            - [ ] CHANGELOG.md updated (if needed)
-            - [ ] Tests added/updated
+            ### Checklist para Merge:
+            - [ ] Todos os checks de CI passaram
+            - [ ] Código revisado e aprovado
+            - [ ] Documentação atualizada
+            - [ ] CHANGELOG.md atualizado (se necessário)
+            - [ ] Testes adicionados/atualizados
 
             ---
-            *This comment will be updated as checks complete*
+            *Este comentário será atualizado conforme as verificações completam*
         continue-on-error: true
