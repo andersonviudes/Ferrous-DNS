@@ -34,7 +34,7 @@ impl Default for LinuxArpReader {
 impl ArpReader for LinuxArpReader {
     async fn read_arp_table(&self) -> Result<ArpTable, DomainError> {
         let content = fs::read_to_string(&self.arp_path).await.map_err(|e| {
-            DomainError::InvalidDomainName(format!("Failed to read ARP cache: {}", e))
+            DomainError::IoError(format!("Failed to read ARP cache: {}", e))
         })?;
 
         let mut arp_table = ArpTable::new();

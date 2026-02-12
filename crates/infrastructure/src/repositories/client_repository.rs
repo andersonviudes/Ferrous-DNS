@@ -51,7 +51,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to query client");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         if let Some((id, ip, mac, hostname, first_seen, last_seen, query_count, last_mac_update, last_hostname_update)) = existing {
@@ -77,7 +77,7 @@ impl ClientRepository for SqliteClientRepository {
             .await
             .map_err(|e| {
                 error!(error = %e, "Failed to create client");
-                DomainError::InvalidDomainName(format!("Database error: {}", e))
+                DomainError::DatabaseError(e.to_string())
             })?;
 
             Ok(Client::new(ip_address))
@@ -101,7 +101,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, ip = %ip_address, "Failed to update last_seen");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(())
@@ -128,7 +128,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to update MAC address");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(())
@@ -155,7 +155,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to update hostname");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(())
@@ -180,7 +180,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch clients");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(rows.into_iter().filter_map(Self::row_to_client).collect())
@@ -206,7 +206,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch active clients");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(rows.into_iter().filter_map(Self::row_to_client).collect())
@@ -227,7 +227,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch client stats");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(ClientStats {
@@ -249,7 +249,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to delete old clients");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(result.rows_affected())
@@ -276,7 +276,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch clients needing MAC update");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(rows.into_iter().filter_map(Self::row_to_client).collect())
@@ -303,7 +303,7 @@ impl ClientRepository for SqliteClientRepository {
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch clients needing hostname update");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
+            DomainError::DatabaseError(e.to_string())
         })?;
 
         Ok(rows.into_iter().filter_map(Self::row_to_client).collect())
