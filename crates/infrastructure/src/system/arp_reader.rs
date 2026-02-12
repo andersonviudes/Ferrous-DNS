@@ -9,8 +9,6 @@ use tracing::{debug, warn};
 /// Validate MAC address format
 /// Accepts formats: aa:bb:cc:dd:ee:ff or aa-bb-cc-dd-ee-ff
 fn is_valid_mac(mac: &str) -> bool {
-    // MAC address: 6 pairs of hex digits separated by : or -
-    // Example: aa:bb:cc:dd:ee:ff or AA-BB-CC-DD-EE-FF
     if mac.len() != 17 {
         return false;
     }
@@ -60,19 +58,15 @@ impl Default for LinuxArpReader {
 #[async_trait]
 impl ArpReader for LinuxArpReader {
     async fn read_arp_table(&self) -> Result<ArpTable, DomainError> {
-        let content = fs::read_to_string(&self.arp_path).await.map_err(|e| {
-            DomainError::IoError(format!("Failed to read ARP cache: {}", e))
-        })?;
+        let content = fs::read_to_string(&self.arp_path)
+            .await
+            .map_err(|e| DomainError::IoError(format!("Failed to read ARP cache: {}", e)))?;
 
         let mut arp_table = ArpTable::new();
 
-        // Format of /proc/net/arp:
-        // IP address       HW type     Flags       HW address            Mask     Device
-        // 192.168.1.1      0x1         0x2         aa:bb:cc:dd:ee:ff     *        eth0
-
         for (line_num, line) in content.lines().enumerate() {
             if line_num == 0 {
-                continue; // Skip header
+                continue;
             }
 
             let fields: Vec<&str> = line.split_whitespace().collect();
@@ -84,15 +78,16 @@ impl ArpReader for LinuxArpReader {
             let flags = fields[2];
             let mac = fields[3];
 
-            // Check if entry is complete (0x2 = COMPLETE)
-            // Incomplete entries have MAC "00:00:00:00:00:00"
             if flags != "0x2" || mac == "00:00:00:00:00:00" {
                 continue;
             }
 
-            // Validate MAC address format
             if !is_valid_mac(mac) {
-                warn!(ip = ip_str, mac = mac, "Invalid MAC address format in ARP table");
+                warn!(
+                    ip = ip_str,
+                    mac = mac,
+                    "Invalid MAC address format in ARP table"
+                );
                 continue;
             }
 

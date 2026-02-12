@@ -76,10 +76,7 @@ async fn test_update_mac_address() {
         .unwrap();
 
     let client = repo.get_or_create(ip).await.unwrap();
-    assert_eq!(
-        client.mac_address,
-        Some(Arc::from("aa:bb:cc:dd:ee:ff"))
-    );
+    assert_eq!(client.mac_address, Some(Arc::from("aa:bb:cc:dd:ee:ff")));
     assert!(client.last_mac_update.is_some());
 }
 

@@ -41,10 +41,7 @@ impl UseCases {
             reload_config: Arc::new(ReloadConfigUseCase::new(config)),
             get_clients: Arc::new(GetClientsUseCase::new(repos.client.clone())),
             track_client: Arc::new(TrackClientUseCase::new(repos.client.clone())),
-            sync_arp: Arc::new(SyncArpCacheUseCase::new(
-                arp_reader,
-                repos.client.clone(),
-            )),
+            sync_arp: Arc::new(SyncArpCacheUseCase::new(arp_reader, repos.client.clone())),
             sync_hostnames: Arc::new(SyncHostnamesUseCase::new(
                 repos.client.clone(),
                 hostname_resolver,

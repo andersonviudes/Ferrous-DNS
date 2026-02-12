@@ -52,14 +52,9 @@ impl Client {
 
     fn is_stale(&self, last_update: &Option<String>, threshold_secs: i64) -> bool {
         if let Some(ts) = last_update {
-            if let Ok(time) =
-                chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S")
-            {
+            if let Ok(time) = chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M:%S") {
                 let update_time =
-                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
-                        time,
-                        chrono::Utc,
-                    );
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(time, chrono::Utc);
                 let now = chrono::Utc::now();
                 return (now - update_time).num_seconds() > threshold_secs;
             }

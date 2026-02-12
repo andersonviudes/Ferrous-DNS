@@ -6,6 +6,18 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::{error, instrument};
 
+type ClientRow = (
+    i64,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    i64,
+    Option<String>,
+    Option<String>,
+);
+
 pub struct SqliteClientRepository {
     pool: SqlitePool,
 }
@@ -15,11 +27,18 @@ impl SqliteClientRepository {
         Self { pool }
     }
 
-    /// Helper to convert database row tuple to Client domain model
-    fn row_to_client(
-        row: (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)
-    ) -> Option<Client> {
-        let (id, ip, mac, hostname, first_seen, last_seen, query_count, last_mac_update, last_hostname_update) = row;
+    fn row_to_client(row: ClientRow) -> Option<Client> {
+        let (
+            id,
+            ip,
+            mac,
+            hostname,
+            first_seen,
+            last_seen,
+            query_count,
+            last_mac_update,
+            last_hostname_update,
+        ) = row;
 
         Some(Client {
             id: Some(id),
@@ -41,8 +60,7 @@ impl ClientRepository for SqliteClientRepository {
     async fn get_or_create(&self, ip_address: IpAddr) -> Result<Client, DomainError> {
         let ip_str = ip_address.to_string();
 
-        // Try to get existing client
-        let existing = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)>(
+        let existing = sqlx::query_as::<_, ClientRow>(
             "SELECT id, ip_address, mac_address, hostname, first_seen, last_seen, query_count, last_mac_update, last_hostname_update
              FROM clients WHERE ip_address = ?"
         )
@@ -54,7 +72,18 @@ impl ClientRepository for SqliteClientRepository {
             DomainError::DatabaseError(e.to_string())
         })?;
 
-        if let Some((id, ip, mac, hostname, first_seen, last_seen, query_count, last_mac_update, last_hostname_update)) = existing {
+        if let Some((
+            id,
+            ip,
+            mac,
+            hostname,
+            first_seen,
+            last_seen,
+            query_count,
+            last_mac_update,
+            last_hostname_update,
+        )) = existing
+        {
             Ok(Client {
                 id: Some(id),
                 ip_address: ip.parse().unwrap(),
@@ -70,7 +99,7 @@ impl ClientRepository for SqliteClientRepository {
             // Create new client
             sqlx::query(
                 "INSERT INTO clients (ip_address, first_seen, last_seen, query_count)
-                 VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)"
+                 VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)",
             )
             .bind(&ip_str)
             .execute(&self.pool)
@@ -94,7 +123,7 @@ impl ClientRepository for SqliteClientRepository {
              ON CONFLICT(ip_address) DO UPDATE SET
                  last_seen = CURRENT_TIMESTAMP,
                  query_count = query_count + 1,
-                 updated_at = CURRENT_TIMESTAMP"
+                 updated_at = CURRENT_TIMESTAMP",
         )
         .bind(&ip_str)
         .execute(&self.pool)
@@ -108,11 +137,7 @@ impl ClientRepository for SqliteClientRepository {
     }
 
     #[instrument(skip(self))]
-    async fn update_mac_address(
-        &self,
-        ip_address: IpAddr,
-        mac: String,
-    ) -> Result<(), DomainError> {
+    async fn update_mac_address(&self, ip_address: IpAddr, mac: String) -> Result<(), DomainError> {
         let ip_str = ip_address.to_string();
 
         sqlx::query(
@@ -120,7 +145,7 @@ impl ClientRepository for SqliteClientRepository {
                  mac_address = ?,
                  last_mac_update = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE ip_address = ?"
+             WHERE ip_address = ?",
         )
         .bind(&mac)
         .bind(&ip_str)
@@ -158,7 +183,7 @@ impl ClientRepository for SqliteClientRepository {
                      mac_address = ?,
                      last_mac_update = CURRENT_TIMESTAMP,
                      updated_at = CURRENT_TIMESTAMP
-                 WHERE ip_address = ?"
+                 WHERE ip_address = ?",
             )
             .bind(&mac)
             .bind(&ip_str)
@@ -193,7 +218,7 @@ impl ClientRepository for SqliteClientRepository {
                  hostname = ?,
                  last_hostname_update = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE ip_address = ?"
+             WHERE ip_address = ?",
         )
         .bind(&hostname)
         .bind(&ip_str)
@@ -209,7 +234,7 @@ impl ClientRepository for SqliteClientRepository {
 
     #[instrument(skip(self))]
     async fn get_all(&self, limit: u32, offset: u32) -> Result<Vec<Client>, DomainError> {
-        let rows = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)>(
+        let rows = sqlx::query_as::<_, ClientRow>(
             "SELECT id, ip_address, mac_address, hostname,
                     datetime(first_seen) as first_seen,
                     datetime(last_seen) as last_seen,
@@ -218,7 +243,7 @@ impl ClientRepository for SqliteClientRepository {
                     datetime(last_hostname_update) as last_hostname_update
              FROM clients
              ORDER BY last_seen DESC
-             LIMIT ? OFFSET ?"
+             LIMIT ? OFFSET ?",
         )
         .bind(limit as i64)
         .bind(offset as i64)
@@ -234,7 +259,7 @@ impl ClientRepository for SqliteClientRepository {
 
     #[instrument(skip(self))]
     async fn get_active(&self, days: u32, limit: u32) -> Result<Vec<Client>, DomainError> {
-        let rows = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)>(
+        let rows = sqlx::query_as::<_, ClientRow>(
             "SELECT id, ip_address, mac_address, hostname,
                     datetime(first_seen) as first_seen,
                     datetime(last_seen) as last_seen,
@@ -244,7 +269,7 @@ impl ClientRepository for SqliteClientRepository {
              FROM clients
              WHERE last_seen > datetime('now', ?)
              ORDER BY last_seen DESC
-             LIMIT ?"
+             LIMIT ?",
         )
         .bind(format!("-{} days", days))
         .bind(limit as i64)
@@ -267,7 +292,7 @@ impl ClientRepository for SqliteClientRepository {
                 COUNT(CASE WHEN last_seen > datetime('now', '-7 days') THEN 1 END) as active_7d,
                 COUNT(CASE WHEN mac_address IS NOT NULL THEN 1 END) as with_mac,
                 COUNT(CASE WHEN hostname IS NOT NULL THEN 1 END) as with_hostname
-             FROM clients"
+             FROM clients",
         )
         .fetch_one(&self.pool)
         .await
@@ -287,23 +312,21 @@ impl ClientRepository for SqliteClientRepository {
 
     #[instrument(skip(self))]
     async fn delete_older_than(&self, days: u32) -> Result<u64, DomainError> {
-        let result = sqlx::query(
-            "DELETE FROM clients WHERE last_seen < datetime('now', ?)"
-        )
-        .bind(format!("-{} days", days))
-        .execute(&self.pool)
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to delete old clients");
-            DomainError::DatabaseError(e.to_string())
-        })?;
+        let result = sqlx::query("DELETE FROM clients WHERE last_seen < datetime('now', ?)")
+            .bind(format!("-{} days", days))
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                error!(error = %e, "Failed to delete old clients");
+                DomainError::DatabaseError(e.to_string())
+            })?;
 
         Ok(result.rows_affected())
     }
 
     #[instrument(skip(self))]
     async fn get_needs_mac_update(&self, limit: u32) -> Result<Vec<Client>, DomainError> {
-        let rows = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)>(
+        let rows = sqlx::query_as::<_, ClientRow>(
             "SELECT id, ip_address, mac_address, hostname,
                     datetime(first_seen) as first_seen,
                     datetime(last_seen) as last_seen,
@@ -315,7 +338,7 @@ impl ClientRepository for SqliteClientRepository {
                     OR last_mac_update < datetime('now', '-5 minutes'))
              AND last_seen > datetime('now', '-1 day')
              ORDER BY last_seen DESC
-             LIMIT ?"
+             LIMIT ?",
         )
         .bind(limit as i64)
         .fetch_all(&self.pool)
@@ -330,7 +353,7 @@ impl ClientRepository for SqliteClientRepository {
 
     #[instrument(skip(self))]
     async fn get_needs_hostname_update(&self, limit: u32) -> Result<Vec<Client>, DomainError> {
-        let rows = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, String, String, i64, Option<String>, Option<String>)>(
+        let rows = sqlx::query_as::<_, ClientRow>(
             "SELECT id, ip_address, mac_address, hostname,
                     datetime(first_seen) as first_seen,
                     datetime(last_seen) as last_seen,
@@ -342,7 +365,7 @@ impl ClientRepository for SqliteClientRepository {
                     OR last_hostname_update < datetime('now', '-1 hour'))
              AND last_seen > datetime('now', '-7 days')
              ORDER BY last_seen DESC
-             LIMIT ?"
+             LIMIT ?",
         )
         .bind(limit as i64)
         .fetch_all(&self.pool)

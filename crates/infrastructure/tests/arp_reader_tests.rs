@@ -16,8 +16,7 @@ async fn test_parse_valid_arp_table() {
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
     assert_eq!(arp_table.len(), 3);
@@ -48,18 +47,12 @@ async fn test_parse_arp_table_filters_incomplete_entries() {
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
-    // Only entries with flags=0x2 and valid MAC should be included
     assert_eq!(arp_table.len(), 2);
-    assert!(arp_table
-        .get(&"192.168.1.3".parse::<IpAddr>().unwrap())
-        .is_none());
-    assert!(arp_table
-        .get(&"192.168.1.4".parse::<IpAddr>().unwrap())
-        .is_none());
+    assert!(!arp_table.contains_key(&"192.168.1.3".parse::<IpAddr>().unwrap()));
+    assert!(!arp_table.contains_key(&"192.168.1.4".parse::<IpAddr>().unwrap()));
 }
 
 #[tokio::test]
@@ -74,8 +67,7 @@ not-an-ip        0x1         0x2         11:22:33:44:55:66     *        eth0
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
     // Only valid IPs should be included
@@ -91,8 +83,7 @@ async fn test_empty_arp_table() {
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
     assert_eq!(arp_table.len(), 0);
@@ -120,8 +111,7 @@ another bad
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
     // Should only parse valid lines
@@ -139,8 +129,7 @@ fe80::1          0x1         0x2         11:22:33:44:55:66     *        eth0
     temp_file.write_all(content.as_bytes()).unwrap();
     temp_file.flush().unwrap();
 
-    let reader =
-        LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
+    let reader = LinuxArpReader::with_path(temp_file.path().to_str().unwrap().to_string());
     let arp_table = reader.read_arp_table().await.unwrap();
 
     // Should support both IPv4 and IPv6

@@ -11,10 +11,7 @@ pub struct SyncArpCacheUseCase {
 }
 
 impl SyncArpCacheUseCase {
-    pub fn new(
-        arp_reader: Arc<dyn ArpReader>,
-        client_repo: Arc<dyn ClientRepository>,
-    ) -> Self {
+    pub fn new(arp_reader: Arc<dyn ArpReader>, client_repo: Arc<dyn ClientRepository>) -> Self {
         Self {
             arp_reader,
             client_repo,

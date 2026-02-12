@@ -10,7 +10,7 @@ pub mod stats;
 
 pub use blocklist::get_blocklist;
 pub use cache::{get_cache_metrics, get_cache_stats};
-pub use clients::{get_clients, get_client_stats};
+pub use clients::{get_client_stats, get_clients};
 pub use config::{get_config, get_settings, reload_config, update_config, update_settings};
 pub use health::health_check;
 pub use hostname::get_hostname;

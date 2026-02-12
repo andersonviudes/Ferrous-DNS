@@ -56,7 +56,15 @@ async fn create_test_app() -> (Router, Arc<SqliteClientRepository>) {
 
     // Create minimal AppState for testing
     let config = Arc::new(RwLock::new(Config::default()));
-    let cache = Arc::new(DnsCache::new(0, Default::default(), 0.0, 0.0, 0, 0.0, false));
+    let cache = Arc::new(DnsCache::new(
+        0,
+        Default::default(),
+        0.0,
+        0.0,
+        0,
+        0.0,
+        false,
+    ));
 
     // Note: These use cases won't be called in client tests, but needed for AppState
     // In a real scenario, you'd mock these properly

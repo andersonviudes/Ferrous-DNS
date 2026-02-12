@@ -1,8 +1,6 @@
 use ferrous_dns_infrastructure::repositories::{
-    blocklist_repository::SqliteBlocklistRepository,
-    client_repository::SqliteClientRepository,
-    config_repository::SqliteConfigRepository,
-    query_log_repository::SqliteQueryLogRepository,
+    blocklist_repository::SqliteBlocklistRepository, client_repository::SqliteClientRepository,
+    config_repository::SqliteConfigRepository, query_log_repository::SqliteQueryLogRepository,
 };
 use sqlx::SqlitePool;
 use std::sync::Arc;

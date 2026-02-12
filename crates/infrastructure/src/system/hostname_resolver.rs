@@ -52,8 +52,6 @@ impl PtrHostnameResolver {
 
 impl Default for PtrHostnameResolver {
     fn default() -> Self {
-        // For default(), create with a dummy PoolManager
-        // This is mainly for testing - production code should use new()
         panic!("PtrHostnameResolver::default() should not be used. Use new() with PoolManager instead.")
     }
 }
@@ -69,7 +67,6 @@ impl HostnameResolver for PtrHostnameResolver {
             "Performing PTR lookup"
         );
 
-        // Query for PTR record using existing DNS infrastructure
         let timeout_ms = self.timeout_secs * 1000;
 
         match self
@@ -78,8 +75,6 @@ impl HostnameResolver for PtrHostnameResolver {
             .await
         {
             Ok(result) => {
-                // PTR records are in raw_answers, not addresses
-                // Look for PTR record in the response
                 for record in &result.response.raw_answers {
                     if let RData::PTR(ptr) = record.data() {
                         let hostname = ptr.to_utf8();
@@ -102,7 +97,6 @@ impl HostnameResolver for PtrHostnameResolver {
                     reverse_domain = %reverse_domain,
                     "PTR lookup failed"
                 );
-                // Return None instead of error - no PTR record is acceptable
                 Ok(None)
             }
         }
@@ -131,7 +125,6 @@ mod tests {
     fn test_ip_to_reverse_domain_ipv6() {
         let ip: IpAddr = "2001:db8::1".parse().unwrap();
         let reverse = PtrHostnameResolver::ip_to_reverse_domain(&ip);
-        // Should be: 1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa
         assert!(reverse.ends_with(".ip6.arpa"));
         assert!(reverse.contains("8.b.d.0.1.0.0.2"));
     }

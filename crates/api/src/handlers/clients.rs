@@ -1,6 +1,9 @@
 use crate::dto::{ClientResponse, ClientStatsResponse, ClientsQuery};
 use crate::state::AppState;
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use tracing::{debug, error, instrument};
 
 #[instrument(skip(state), name = "api_get_clients")]

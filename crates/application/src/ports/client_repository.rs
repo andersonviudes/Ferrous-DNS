@@ -11,11 +11,7 @@ pub trait ClientRepository: Send + Sync {
     async fn update_last_seen(&self, ip_address: IpAddr) -> Result<(), DomainError>;
 
     /// Update client's MAC address
-    async fn update_mac_address(
-        &self,
-        ip_address: IpAddr,
-        mac: String,
-    ) -> Result<(), DomainError>;
+    async fn update_mac_address(&self, ip_address: IpAddr, mac: String) -> Result<(), DomainError>;
 
     /// Batch update MAC addresses for multiple clients (more efficient)
     async fn batch_update_mac_addresses(

@@ -31,7 +31,11 @@ impl SyncHostnamesUseCase {
         let mut resolved = 0u64;
 
         for client in clients {
-            match self.hostname_resolver.resolve_hostname(client.ip_address).await {
+            match self
+                .hostname_resolver
+                .resolve_hostname(client.ip_address)
+                .await
+            {
                 Ok(Some(hostname)) => {
                     match self
                         .client_repo
@@ -39,7 +43,9 @@ impl SyncHostnamesUseCase {
                         .await
                     {
                         Ok(_) => resolved += 1,
-                        Err(e) => warn!(error = %e, ip = %client.ip_address, "Failed to update hostname"),
+                        Err(e) => {
+                            warn!(error = %e, ip = %client.ip_address, "Failed to update hostname")
+                        }
                     }
                 }
                 Ok(None) => {
