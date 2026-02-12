@@ -4,12 +4,6 @@ use tracing::{info, instrument};
 
 use crate::ports::GroupRepository;
 
-/// Use case for updating a group.
-///
-/// This use case enforces business rules:
-/// - The default "Protected" group cannot be disabled
-/// - Group names must be valid and unique
-/// - Comments must not exceed maximum length
 pub struct UpdateGroupUseCase {
     group_repo: Arc<dyn GroupRepository>,
 }
@@ -19,26 +13,6 @@ impl UpdateGroupUseCase {
         Self { group_repo }
     }
 
-    /// Updates a group.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The group ID
-    /// * `name` - Optional new name
-    /// * `enabled` - Optional new enabled status
-    /// * `comment` - Optional new comment
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Group)` - The updated group
-    /// * `Err(DomainError)` - If update fails
-    ///
-    /// # Errors
-    ///
-    /// * `DomainError::GroupNotFound` - If the group doesn't exist
-    /// * `DomainError::ProtectedGroupCannotBeDisabled` - If attempting to disable the default group
-    /// * `DomainError::InvalidGroupName` - If the name is invalid or conflicts
-    /// * `DomainError::DatabaseError` - If a database error occurs
     #[instrument(skip(self))]
     pub async fn execute(
         &self,
@@ -47,7 +21,6 @@ impl UpdateGroupUseCase {
         enabled: Option<bool>,
         comment: Option<String>,
     ) -> Result<Group, DomainError> {
-        // Get the existing group
         let group = self
             .group_repo
             .get_by_id(id)
@@ -57,22 +30,18 @@ impl UpdateGroupUseCase {
                 id
             )))?;
 
-        // Validate name if provided
         if let Some(ref n) = name {
             Group::validate_name(n)?;
         }
 
-        // Validate comment if provided
         if let Some(ref c) = comment {
             Group::validate_comment(&Some(Arc::from(c.as_str())))?;
         }
 
-        // Business rule: Cannot disable the default "Protected" group
         if enabled == Some(false) && group.is_default {
             return Err(DomainError::ProtectedGroupCannotBeDisabled);
         }
 
-        // Update the group
         let updated_group = self.group_repo.update(id, name, enabled, comment).await?;
 
         info!(

@@ -1,7 +1,6 @@
 use ferrous_dns_domain::Group;
 use serde::{Deserialize, Serialize};
 
-/// Response DTO for group information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupResponse {
     pub id: i64,
@@ -29,7 +28,6 @@ impl GroupResponse {
     }
 }
 
-/// Request DTO for creating a group
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateGroupRequest {
     pub name: String,
@@ -37,7 +35,6 @@ pub struct CreateGroupRequest {
     pub comment: Option<String>,
 }
 
-/// Request DTO for updating a group
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateGroupRequest {
     pub name: Option<String>,
@@ -45,7 +42,6 @@ pub struct UpdateGroupRequest {
     pub comment: Option<String>,
 }
 
-/// Request DTO for assigning a client to a group
 #[derive(Debug, Clone, Deserialize)]
 pub struct AssignGroupRequest {
     pub group_id: i64,
