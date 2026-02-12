@@ -40,7 +40,7 @@ ON groups(is_default) WHERE is_default = 1;
 -- This group is created automatically and serves as the default for all clients
 -- It cannot be disabled or deleted to ensure all clients always have a group
 
-INSERT OR IGNORE INTO groups (id, name, enabled, comment, is_default)
+INSERT INTO groups (id, name, enabled, comment, is_default)
 VALUES (
     1,
     'Protected',
