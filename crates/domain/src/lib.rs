@@ -1,5 +1,6 @@
 pub mod blocklist;
 pub mod client;
+pub mod client_subnet;
 pub mod config;
 pub mod dns_protocol;
 pub mod dns_query;
@@ -12,6 +13,7 @@ pub mod query_log;
 
 pub use blocklist::BlockedDomain;
 pub use client::{Client, ClientStats};
+pub use client_subnet::{ClientSubnet, SubnetMatcher};
 pub use config::{
     CliOverrides, ConditionalForward, Config, ConfigError, DnsConfig, HealthCheckConfig,
     LocalDnsRecord, UpstreamPool, UpstreamStrategy,

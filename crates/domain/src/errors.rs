@@ -43,4 +43,13 @@ pub enum DomainError {
 
     #[error("Invalid group name: {0}")]
     InvalidGroupName(String),
+
+    #[error("Invalid CIDR format: {0}")]
+    InvalidCidr(String),
+
+    #[error("Subnet not found: {0}")]
+    SubnetNotFound(String),
+
+    #[error("Subnet conflicts with existing: {0}")]
+    SubnetConflict(String),
 }
