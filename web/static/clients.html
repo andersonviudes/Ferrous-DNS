@@ -396,16 +396,7 @@
                             <td class="monospace" x-text="client.ip_address">-</td>
                             <td class="monospace" x-text="client.mac_address||'-'">-</td>
                             <td x-text="client.hostname||'-'">-</td>
-                            <td>
-                                <select @change="changeClientGroup(client.id, $event.target.value)"
-                                        style="padding:4px 8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px">
-                                    <option value="">No Group</option>
-                                    <template x-for="group in groups" :key="group.id">
-                                        <option :value="group.id" :selected="client.group_id===group.id"
-                                                x-text="group.name"></option>
-                                    </template>
-                                </select>
-                            </td>
+                            <td x-text="getGroupName(client.group_id)">-</td>
                             <td x-text="formatDateTime(client.first_seen)">-</td>
                             <td x-text="formatDateTime(client.last_seen)">-</td>
                             <td x-text="client.query_count||0">0</td>
@@ -603,6 +594,11 @@
                 } catch (e) {
                     console.error('Failed to load subnets:', e)
                 }
+            },
+            getGroupName(groupId) {
+                if (!groupId) return 'No Group';
+                const group = this.groups.find(g => g.id === groupId);
+                return group ? group.name : 'Unknown';
             },
             async changeClientGroup(clientId, groupId) {
                 try {
