@@ -384,6 +384,7 @@
                         <th>IP Address</th>
                         <th>MAC Address</th>
                         <th>Hostname</th>
+                        <th>Group</th>
                         <th>First Seen</th>
                         <th>Last Seen</th>
                         <th>Query Count</th>
@@ -395,6 +396,16 @@
                             <td class="monospace" x-text="client.ip_address">-</td>
                             <td class="monospace" x-text="client.mac_address||'-'">-</td>
                             <td x-text="client.hostname||'-'">-</td>
+                            <td>
+                                <select @change="changeClientGroup(client.id, $event.target.value)"
+                                        style="padding:4px 8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px">
+                                    <option value="">No Group</option>
+                                    <template x-for="group in groups" :key="group.id">
+                                        <option :value="group.id" :selected="client.group_id===group.id"
+                                                x-text="group.name"></option>
+                                    </template>
+                                </select>
+                            </td>
                             <td x-text="formatDateTime(client.first_seen)">-</td>
                             <td x-text="formatDateTime(client.last_seen)">-</td>
                             <td x-text="client.query_count||0">0</td>
@@ -405,10 +416,117 @@
             </div>
         </div>
         <div x-show="activeTab==='management'" style="padding:24px">
-            <div class="empty-state">
-                <i data-lucide="wrench" style="width:48px;height:48px;margin:0 auto 16px;opacity:0.3"></i>
-                <p style="font-size:16px;font-weight:500;margin-bottom:8px">Client Management</p>
-                <p style="font-size:14px;opacity:0.7">Client management features coming soon</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
+                <!-- Add Manual Client Form -->
+                <div style="background:var(--bg-tertiary);padding:20px;border-radius:8px">
+                    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary)">
+                        <i data-lucide="user-plus" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
+                        Add Manual Client
+                    </h3>
+                    <form @submit.prevent="addManualClient()" style="display:flex;flex-direction:column;gap:12px">
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">IP Address *</label>
+                            <input x-model="newClient.ip" type="text" placeholder="192.168.1.100" required
+                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                        </div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Group</label>
+                            <select x-model="newClient.group_id"
+                                    style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                                <option value="">No Group</option>
+                                <template x-for="group in groups" :key="group.id">
+                                    <option :value="group.id" x-text="group.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Hostname</label>
+                            <input x-model="newClient.hostname" type="text" placeholder="device-name"
+                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                        </div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">MAC Address</label>
+                            <input x-model="newClient.mac" type="text" placeholder="aa:bb:cc:dd:ee:ff"
+                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                        </div>
+                        <button type="submit"
+                                style="padding:10px;background:var(--color-primary);color:white;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-top:8px">
+                            Add Client
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Add Subnet Form -->
+                <div style="background:var(--bg-tertiary);padding:20px;border-radius:8px">
+                    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary)">
+                        <i data-lucide="network" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
+                        Add Client Subnet
+                    </h3>
+                    <form @submit.prevent="addSubnet()" style="display:flex;flex-direction:column;gap:12px">
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Subnet CIDR *</label>
+                            <input x-model="newSubnet.cidr" type="text" placeholder="192.168.1.0/24" required
+                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                        </div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Group *</label>
+                            <select x-model="newSubnet.group_id" required
+                                    style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                                <option value="">Select Group</option>
+                                <template x-for="group in groups" :key="group.id">
+                                    <option :value="group.id" x-text="group.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Comment</label>
+                            <input x-model="newSubnet.comment" type="text" placeholder="Office subnet"
+                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                        </div>
+                        <button type="submit"
+                                style="padding:10px;background:var(--color-success);color:white;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-top:8px">
+                            Add Subnet
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Configured Subnets List -->
+            <div style="background:var(--bg-tertiary);padding:20px;border-radius:8px">
+                <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary)">
+                    <i data-lucide="list" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
+                    Configured Subnets
+                </h3>
+                <div x-show="subnets.length===0" style="text-align:center;padding:32px;color:var(--text-secondary)">
+                    <p>No subnets configured yet</p>
+                </div>
+                <table x-show="subnets.length>0" style="width:100%">
+                    <thead>
+                    <tr>
+                        <th style="text-align:left;padding:8px;font-size:12px;color:var(--text-secondary)">Subnet</th>
+                        <th style="text-align:left;padding:8px;font-size:12px;color:var(--text-secondary)">Group</th>
+                        <th style="text-align:left;padding:8px;font-size:12px;color:var(--text-secondary)">Comment</th>
+                        <th style="text-align:left;padding:8px;font-size:12px;color:var(--text-secondary)">Created</th>
+                        <th style="text-align:center;padding:8px;font-size:12px;color:var(--text-secondary)">Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <template x-for="subnet in subnets" :key="subnet.id">
+                        <tr style="border-top:1px solid var(--border-color)">
+                            <td class="monospace" style="padding:8px;font-size:13px" x-text="subnet.subnet_cidr"></td>
+                            <td style="padding:8px;font-size:13px" x-text="subnet.group_name||'Unknown'"></td>
+                            <td style="padding:8px;font-size:13px" x-text="subnet.comment||'-'"></td>
+                            <td style="padding:8px;font-size:13px" x-text="formatDateTime(subnet.created_at)"></td>
+                            <td style="padding:8px;text-align:center">
+                                <button @click="deleteSubnet(subnet.id)"
+                                        style="padding:4px 8px;background:var(--color-error);color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -419,6 +537,10 @@
             theme: 'light',
             activeTab: 'known-clients',
             clients: [],
+            groups: [],
+            subnets: [],
+            newClient: {ip: '', group_id: '', hostname: '', mac: ''},
+            newSubnet: {cidr: '', group_id: '', comment: ''},
             stats: {
                 total_clients: 0,
                 active_24h: 0,
@@ -440,7 +562,7 @@
                 setTimeout(() => lucide.createIcons(), 50)
             },
             async loadAllData() {
-                await Promise.all([this.loadClients(), this.loadStats()])
+                await Promise.all([this.loadClients(), this.loadStats(), this.loadGroups(), this.loadSubnets()])
             },
             async loadClients() {
                 try {
@@ -460,6 +582,110 @@
                     }
                 } catch (e) {
                     console.error('Failed to load stats:', e)
+                }
+            },
+            async loadGroups() {
+                try {
+                    const res = await fetch('/api/groups');
+                    if (res.ok) {
+                        this.groups = await res.json()
+                    }
+                } catch (e) {
+                    console.error('Failed to load groups:', e)
+                }
+            },
+            async loadSubnets() {
+                try {
+                    const res = await fetch('/api/client-subnets');
+                    if (res.ok) {
+                        this.subnets = await res.json()
+                    }
+                } catch (e) {
+                    console.error('Failed to load subnets:', e)
+                }
+            },
+            async changeClientGroup(clientId, groupId) {
+                try {
+                    const res = await fetch(`/api/clients/${clientId}/group`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({group_id: groupId || null})
+                    });
+                    if (res.ok) {
+                        await this.loadClients()
+                    } else {
+                        alert('Failed to update client group')
+                    }
+                } catch (e) {
+                    console.error('Failed to change group:', e);
+                    alert('Error updating client group')
+                }
+            },
+            async addManualClient() {
+                try {
+                    const payload = {
+                        ip_address: this.newClient.ip,
+                        group_id: this.newClient.group_id || null,
+                        hostname: this.newClient.hostname || null,
+                        mac_address: this.newClient.mac || null
+                    };
+                    const res = await fetch('/api/clients', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                        this.newClient = {ip: '', group_id: '', hostname: '', mac: ''};
+                        await this.loadClients();
+                        alert('Client added successfully!')
+                    } else {
+                        const error = await res.text();
+                        alert('Failed to add client: ' + error)
+                    }
+                } catch (e) {
+                    console.error('Failed to add client:', e);
+                    alert('Error adding client')
+                }
+            },
+            async addSubnet() {
+                try {
+                    const payload = {
+                        subnet_cidr: this.newSubnet.cidr,
+                        group_id: parseInt(this.newSubnet.group_id),
+                        comment: this.newSubnet.comment || null
+                    };
+                    const res = await fetch('/api/client-subnets', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                        this.newSubnet = {cidr: '', group_id: '', comment: ''};
+                        await this.loadSubnets();
+                        alert('Subnet added successfully!')
+                    } else {
+                        const error = await res.text();
+                        alert('Failed to add subnet: ' + error)
+                    }
+                } catch (e) {
+                    console.error('Failed to add subnet:', e);
+                    alert('Error adding subnet')
+                }
+            },
+            async deleteSubnet(id) {
+                if (!confirm('Are you sure you want to delete this subnet?')) return;
+                try {
+                    const res = await fetch(`/api/client-subnets/${id}`, {method: 'DELETE'});
+                    if (res.ok) {
+                        await this.loadSubnets();
+                        alert('Subnet deleted successfully!')
+                    } else {
+                        const error = await res.text();
+                        alert('Failed to delete subnet: ' + error)
+                    }
+                } catch (e) {
+                    console.error('Failed to delete subnet:', e);
+                    alert('Error deleting subnet')
                 }
             },
             startPolling() {
