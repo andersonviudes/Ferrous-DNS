@@ -96,12 +96,15 @@ impl ClientRepository for SqliteClientRepository {
                 last_hostname_update,
             })
         } else {
-            // Create new client
+            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
             sqlx::query(
                 "INSERT INTO clients (ip_address, first_seen, last_seen, query_count)
-                 VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)",
+                 VALUES (?, ?, ?, 0)",
             )
             .bind(&ip_str)
+            .bind(&now)
+            .bind(&now)
             .execute(&self.pool)
             .await
             .map_err(|e| {
@@ -116,16 +119,21 @@ impl ClientRepository for SqliteClientRepository {
     #[instrument(skip(self))]
     async fn update_last_seen(&self, ip_address: IpAddr) -> Result<(), DomainError> {
         let ip_str = ip_address.to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         sqlx::query(
             "INSERT INTO clients (ip_address, first_seen, last_seen, query_count)
-             VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+             VALUES (?, ?, ?, 1)
              ON CONFLICT(ip_address) DO UPDATE SET
-                 last_seen = CURRENT_TIMESTAMP,
+                 last_seen = ?,
                  query_count = query_count + 1,
-                 updated_at = CURRENT_TIMESTAMP",
+                 updated_at = ?",
         )
         .bind(&ip_str)
+        .bind(&now)
+        .bind(&now)
+        .bind(&now)
+        .bind(&now)
         .execute(&self.pool)
         .await
         .map_err(|e| {
@@ -139,15 +147,18 @@ impl ClientRepository for SqliteClientRepository {
     #[instrument(skip(self))]
     async fn update_mac_address(&self, ip_address: IpAddr, mac: String) -> Result<(), DomainError> {
         let ip_str = ip_address.to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         sqlx::query(
             "UPDATE clients SET
                  mac_address = ?,
-                 last_mac_update = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
+                 last_mac_update = ?,
+                 updated_at = ?
              WHERE ip_address = ?",
         )
         .bind(&mac)
+        .bind(&now)
+        .bind(&now)
         .bind(&ip_str)
         .execute(&self.pool)
         .await
@@ -174,6 +185,7 @@ impl ClientRepository for SqliteClientRepository {
         })?;
 
         let mut updated_count = 0u64;
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         for (ip_address, mac) in updates {
             let ip_str = ip_address.to_string();
@@ -181,11 +193,13 @@ impl ClientRepository for SqliteClientRepository {
             let result = sqlx::query(
                 "UPDATE clients SET
                      mac_address = ?,
-                     last_mac_update = CURRENT_TIMESTAMP,
-                     updated_at = CURRENT_TIMESTAMP
+                     last_mac_update = ?,
+                     updated_at = ?
                  WHERE ip_address = ?",
             )
             .bind(&mac)
+            .bind(&now)
+            .bind(&now)
             .bind(&ip_str)
             .execute(&mut *tx)
             .await
@@ -212,15 +226,18 @@ impl ClientRepository for SqliteClientRepository {
         hostname: String,
     ) -> Result<(), DomainError> {
         let ip_str = ip_address.to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         sqlx::query(
             "UPDATE clients SET
                  hostname = ?,
-                 last_hostname_update = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
+                 last_hostname_update = ?,
+                 updated_at = ?
              WHERE ip_address = ?",
         )
         .bind(&hostname)
+        .bind(&now)
+        .bind(&now)
         .bind(&ip_str)
         .execute(&self.pool)
         .await
