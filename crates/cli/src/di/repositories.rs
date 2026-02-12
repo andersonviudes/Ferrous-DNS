@@ -1,6 +1,9 @@
 use ferrous_dns_infrastructure::repositories::{
-    blocklist_repository::SqliteBlocklistRepository, client_repository::SqliteClientRepository,
-    config_repository::SqliteConfigRepository, group_repository::SqliteGroupRepository,
+    blocklist_repository::SqliteBlocklistRepository,
+    client_repository::SqliteClientRepository,
+    client_subnet_repository::SqliteClientSubnetRepository,
+    config_repository::SqliteConfigRepository,
+    group_repository::SqliteGroupRepository,
     query_log_repository::SqliteQueryLogRepository,
 };
 use sqlx::SqlitePool;
@@ -12,6 +15,7 @@ pub struct Repositories {
     pub config: Arc<SqliteConfigRepository>,
     pub client: Arc<SqliteClientRepository>,
     pub group: Arc<SqliteGroupRepository>,
+    pub client_subnet: Arc<SqliteClientSubnetRepository>,
 }
 
 impl Repositories {
@@ -22,7 +26,8 @@ impl Repositories {
             blocklist: Arc::new(blocklist),
             config: Arc::new(SqliteConfigRepository::new(pool.clone())),
             client: Arc::new(SqliteClientRepository::new(pool.clone())),
-            group: Arc::new(SqliteGroupRepository::new(pool)),
+            group: Arc::new(SqliteGroupRepository::new(pool.clone())),
+            client_subnet: Arc::new(SqliteClientSubnetRepository::new(pool)),
         })
     }
 }

@@ -92,6 +92,13 @@ async fn main() -> anyhow::Result<()> {
     retention_job.start().await;
     info!("Client tracking background jobs started");
 
+    // Initialize subnet matcher cache
+    info!("Loading subnet matcher cache");
+    if let Err(e) = use_cases.subnet_matcher.refresh().await {
+        error!(error = %e, "Failed to load subnet matcher cache");
+    }
+    info!("Subnet matcher cache loaded");
+
     // Create AppState for web server
     let app_state = AppState {
         get_stats: use_cases.get_stats,
@@ -103,6 +110,11 @@ async fn main() -> anyhow::Result<()> {
         update_group: use_cases.update_group,
         delete_group: use_cases.delete_group,
         assign_client_group: use_cases.assign_client_group,
+        get_client_subnets: use_cases.get_client_subnets,
+        create_client_subnet: use_cases.create_client_subnet,
+        delete_client_subnet: use_cases.delete_client_subnet,
+        create_manual_client: use_cases.create_manual_client,
+        subnet_matcher: use_cases.subnet_matcher.clone(),
         config: config_arc,
         cache: dns_services.cache.clone(),
         dns_resolver: dns_services.resolver.clone(),

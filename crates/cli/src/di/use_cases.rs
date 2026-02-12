@@ -1,10 +1,12 @@
 use super::Repositories;
+use ferrous_dns_application::services::SubnetMatcherService;
 use ferrous_dns_application::use_cases::{
-    AssignClientGroupUseCase, CleanupOldClientsUseCase, CreateGroupUseCase, DeleteGroupUseCase,
-    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientsUseCase, GetConfigUseCase,
-    GetGroupsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, ReloadConfigUseCase,
-    SyncArpCacheUseCase, SyncHostnamesUseCase, TrackClientUseCase, UpdateConfigUseCase,
-    UpdateGroupUseCase,
+    AssignClientGroupUseCase, CleanupOldClientsUseCase, CreateClientSubnetUseCase,
+    CreateGroupUseCase, CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteGroupUseCase,
+    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase, GetClientsUseCase,
+    GetConfigUseCase, GetGroupsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
+    ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase, TrackClientUseCase,
+    UpdateConfigUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::PoolManager;
@@ -31,6 +33,11 @@ pub struct UseCases {
     pub update_group: Arc<UpdateGroupUseCase>,
     pub delete_group: Arc<DeleteGroupUseCase>,
     pub assign_client_group: Arc<AssignClientGroupUseCase>,
+    pub get_client_subnets: Arc<GetClientSubnetsUseCase>,
+    pub create_client_subnet: Arc<CreateClientSubnetUseCase>,
+    pub delete_client_subnet: Arc<DeleteClientSubnetUseCase>,
+    pub create_manual_client: Arc<CreateManualClientUseCase>,
+    pub subnet_matcher: Arc<SubnetMatcherService>,
 }
 
 impl UseCases {
@@ -41,6 +48,9 @@ impl UseCases {
     ) -> Self {
         let arp_reader = Arc::new(LinuxArpReader::new());
         let hostname_resolver = Arc::new(PtrHostnameResolver::new(pool_manager, 5));
+
+        // Initialize SubnetMatcherService
+        let subnet_matcher = Arc::new(SubnetMatcherService::new(repos.client_subnet.clone()));
 
         Self {
             get_stats: Arc::new(GetQueryStatsUseCase::new(repos.query_log.clone())),
@@ -66,6 +76,21 @@ impl UseCases {
                 repos.client.clone(),
                 repos.group.clone(),
             )),
+            get_client_subnets: Arc::new(GetClientSubnetsUseCase::new(
+                repos.client_subnet.clone(),
+            )),
+            create_client_subnet: Arc::new(CreateClientSubnetUseCase::new(
+                repos.client_subnet.clone(),
+                repos.group.clone(),
+            )),
+            delete_client_subnet: Arc::new(DeleteClientSubnetUseCase::new(
+                repos.client_subnet.clone(),
+            )),
+            create_manual_client: Arc::new(CreateManualClientUseCase::new(
+                repos.client.clone(),
+                repos.group.clone(),
+            )),
+            subnet_matcher,
         }
     }
 }
