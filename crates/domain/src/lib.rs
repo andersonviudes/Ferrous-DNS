@@ -6,6 +6,7 @@ pub mod dns_query;
 pub mod dns_record;
 pub mod dns_request;
 pub mod errors;
+pub mod group;
 pub mod query_filters;
 pub mod query_log;
 
@@ -20,5 +21,6 @@ pub use dns_query::DnsQuery;
 pub use dns_record::{DnsRecord, RecordCategory, RecordType};
 pub use dns_request::DnsRequest;
 pub use errors::DomainError;
+pub use group::{Group, GroupStats};
 pub use query_filters::{FqdnFilter, PrivateIpFilter};
 pub use query_log::{CacheStats, QueryLog, QuerySource, QueryStats};

@@ -1,7 +1,9 @@
 pub mod blocklist;
 pub mod cache;
+pub mod client_groups;
 pub mod clients;
 pub mod config;
+pub mod groups;
 pub mod health;
 pub mod hostname;
 pub mod local_records;
@@ -10,6 +12,7 @@ pub mod stats;
 
 pub use blocklist::get_blocklist;
 pub use cache::{get_cache_metrics, get_cache_stats};
+pub use client_groups::assign_client_to_group;
 pub use clients::{get_client_stats, get_clients};
 pub use config::{get_config, get_settings, reload_config, update_config, update_settings};
 pub use health::health_check;

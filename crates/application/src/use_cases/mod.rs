@@ -3,6 +3,7 @@ pub mod cache;
 pub mod clients;
 pub mod config;
 pub mod dns;
+pub mod groups;
 pub mod queries;
 
 // Re-export use cases
@@ -14,4 +15,8 @@ pub use clients::{
 };
 pub use config::{GetConfigUseCase, ReloadConfigUseCase, UpdateConfigUseCase};
 pub use dns::HandleDnsQueryUseCase;
+pub use groups::{
+    AssignClientGroupUseCase, CreateGroupUseCase, DeleteGroupUseCase, GetGroupsUseCase,
+    UpdateGroupUseCase,
+};
 pub use queries::{GetQueryStatsUseCase, GetRecentQueriesUseCase};

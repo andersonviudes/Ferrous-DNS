@@ -1,8 +1,10 @@
 use super::Repositories;
 use ferrous_dns_application::use_cases::{
-    CleanupOldClientsUseCase, GetBlocklistUseCase, GetCacheStatsUseCase, GetClientsUseCase,
-    GetConfigUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, ReloadConfigUseCase,
+    AssignClientGroupUseCase, CleanupOldClientsUseCase, CreateGroupUseCase, DeleteGroupUseCase,
+    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientsUseCase, GetConfigUseCase,
+    GetGroupsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, ReloadConfigUseCase,
     SyncArpCacheUseCase, SyncHostnamesUseCase, TrackClientUseCase, UpdateConfigUseCase,
+    UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::PoolManager;
@@ -24,6 +26,11 @@ pub struct UseCases {
     pub sync_arp: Arc<SyncArpCacheUseCase>,
     pub sync_hostnames: Arc<SyncHostnamesUseCase>,
     pub cleanup_clients: Arc<CleanupOldClientsUseCase>,
+    pub get_groups: Arc<GetGroupsUseCase>,
+    pub create_group: Arc<CreateGroupUseCase>,
+    pub update_group: Arc<UpdateGroupUseCase>,
+    pub delete_group: Arc<DeleteGroupUseCase>,
+    pub assign_client_group: Arc<AssignClientGroupUseCase>,
 }
 
 impl UseCases {
@@ -51,6 +58,14 @@ impl UseCases {
                 hostname_resolver,
             )),
             cleanup_clients: Arc::new(CleanupOldClientsUseCase::new(repos.client.clone())),
+            get_groups: Arc::new(GetGroupsUseCase::new(repos.group.clone())),
+            create_group: Arc::new(CreateGroupUseCase::new(repos.group.clone())),
+            update_group: Arc::new(UpdateGroupUseCase::new(repos.group.clone())),
+            delete_group: Arc::new(DeleteGroupUseCase::new(repos.group.clone())),
+            assign_client_group: Arc::new(AssignClientGroupUseCase::new(
+                repos.client.clone(),
+                repos.group.clone(),
+            )),
         }
     }
 }

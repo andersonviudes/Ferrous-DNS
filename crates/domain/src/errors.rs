@@ -25,4 +25,22 @@ pub enum DomainError {
 
     #[error("Query filtered: {0}")]
     FilteredQuery(String),
+
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+
+    #[error("Group not found: {0}")]
+    GroupNotFound(String),
+
+    #[error("Protected group cannot be disabled")]
+    ProtectedGroupCannotBeDisabled,
+
+    #[error("Protected group cannot be deleted")]
+    ProtectedGroupCannotBeDeleted,
+
+    #[error("Cannot delete group with {0} assigned clients")]
+    GroupHasAssignedClients(u64),
+
+    #[error("Invalid group name: {0}")]
+    InvalidGroupName(String),
 }
