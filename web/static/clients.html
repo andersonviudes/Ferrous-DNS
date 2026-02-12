@@ -407,76 +407,82 @@
             </div>
         </div>
         <div x-show="activeTab==='management'" style="padding:24px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
-                <!-- Add Manual Client Form -->
-                <div style="background:var(--bg-tertiary);padding:20px;border-radius:8px">
+            <!-- Unified Add Client/Subnet Form -->
+            <div style="max-width:600px;margin:0 auto 32px">
+                <div style="background:var(--bg-tertiary);padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
                     <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary)">
-                        <i data-lucide="user-plus" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
-                        Add Manual Client
+                        <i data-lucide="plus-circle" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
+                        Add Client or Subnet
                     </h3>
-                    <form @submit.prevent="addManualClient()" style="display:flex;flex-direction:column;gap:12px">
+
+                    <!-- Type Detection Badge -->
+                    <div x-show="unifiedForm.detectedType"
+                         style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px;transition:all 0.2s"
+                         :style="'background:' + (unifiedForm.detectedType === 'subnet' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)') + ';color:' + (unifiedForm.detectedType === 'subnet' ? '#10b981' : '#3b82f6')">
+                        <i :data-lucide="getTypeIcon()" style="width:14px;height:14px"></i>
+                        <span x-text="getTypeLabel()"></span>
+                    </div>
+
+                    <form @submit.prevent="submitUnifiedForm()" style="display:flex;flex-direction:column;gap:14px">
+                        <!-- Address Input -->
                         <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">IP Address *</label>
-                            <input x-model="newClient.ip" type="text" placeholder="192.168.1.100" required
-                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:6px">
+                                Address / Network *
+                            </label>
+                            <input x-model="unifiedForm.address"
+                                   @input="detectAddressType()"
+                                   type="text"
+                                   placeholder="192.168.1.100 or 192.168.1.0/24"
+                                   required
+                                   style="width:100%;padding:10px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:14px">
+                            <p x-show="unifiedForm.validationError"
+                               x-text="unifiedForm.validationError"
+                               style="margin-top:6px;font-size:12px;color:#ef4444"></p>
                         </div>
+
+                        <!-- Group Selection -->
                         <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Group</label>
-                            <select x-model="newClient.group_id"
-                                    style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:6px">
+                                Group <span x-show="unifiedForm.detectedType === 'subnet'" style="color:#ef4444">*</span>
+                            </label>
+                            <select x-model="unifiedForm.group_id"
+                                    :required="unifiedForm.detectedType === 'subnet'"
+                                    style="width:100%;padding:10px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:14px">
                                 <option value="">No Group</option>
                                 <template x-for="group in groups" :key="group.id">
                                     <option :value="group.id" x-text="group.name"></option>
                                 </template>
                             </select>
                         </div>
-                        <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Hostname</label>
-                            <input x-model="newClient.hostname" type="text" placeholder="device-name"
-                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
-                        </div>
-                        <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">MAC Address</label>
-                            <input x-model="newClient.mac" type="text" placeholder="aa:bb:cc:dd:ee:ff"
-                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
-                        </div>
-                        <button type="submit"
-                                style="padding:10px;background:var(--color-primary);color:white;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-top:8px">
-                            Add Client
-                        </button>
-                    </form>
-                </div>
 
-                <!-- Add Subnet Form -->
-                <div style="background:var(--bg-tertiary);padding:20px;border-radius:8px">
-                    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary)">
-                        <i data-lucide="network" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i>
-                        Add Client Subnet
-                    </h3>
-                    <form @submit.prevent="addSubnet()" style="display:flex;flex-direction:column;gap:12px">
+                        <!-- Dynamic Metadata Field (Hostname or Comment) -->
                         <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Subnet CIDR *</label>
-                            <input x-model="newSubnet.cidr" type="text" placeholder="192.168.1.0/24" required
-                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:6px"
+                                   x-text="unifiedForm.detectedType === 'subnet' ? 'Comment' : 'Hostname'">
+                                Hostname
+                            </label>
+                            <input x-model="unifiedForm.metadata"
+                                   type="text"
+                                   :placeholder="unifiedForm.detectedType === 'subnet' ? 'Office subnet' : 'device-name'"
+                                   style="width:100%;padding:10px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:14px">
                         </div>
-                        <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Group *</label>
-                            <select x-model="newSubnet.group_id" required
-                                    style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
-                                <option value="">Select Group</option>
-                                <template x-for="group in groups" :key="group.id">
-                                    <option :value="group.id" x-text="group.name"></option>
-                                </template>
-                            </select>
+
+                        <!-- MAC Address (Only for IP) -->
+                        <div x-show="unifiedForm.detectedType === 'ip'">
+                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:6px">
+                                MAC Address
+                            </label>
+                            <input x-model="unifiedForm.mac"
+                                   type="text"
+                                   placeholder="aa:bb:cc:dd:ee:ff"
+                                   style="width:100%;padding:10px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:14px">
                         </div>
-                        <div>
-                            <label style="font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px">Comment</label>
-                            <input x-model="newSubnet.comment" type="text" placeholder="Office subnet"
-                                   style="width:100%;padding:8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
-                        </div>
+
+                        <!-- Submit Button -->
                         <button type="submit"
-                                style="padding:10px;background:var(--color-success);color:white;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-top:8px">
-                            Add Subnet
+                                :disabled="!unifiedForm.detectedType || unifiedForm.validationError"
+                                :style="'padding:12px;color:white;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-top:8px;font-size:14px;background:' + getSubmitButtonColor() + ';opacity:' + (!unifiedForm.detectedType || unifiedForm.validationError ? '0.5' : '1')">
+                            <span x-text="getSubmitButtonText()">Add</span>
                         </button>
                     </form>
                 </div>
@@ -532,6 +538,14 @@
             subnets: [],
             newClient: {ip: '', group_id: '', hostname: '', mac: ''},
             newSubnet: {cidr: '', group_id: '', comment: ''},
+            unifiedForm: {
+                address: '',
+                group_id: '',
+                metadata: '',
+                mac: '',
+                detectedType: null,
+                validationError: ''
+            },
             stats: {
                 total_clients: 0,
                 active_24h: 0,
@@ -599,6 +613,135 @@
                 if (!groupId) return 'No Group';
                 const group = this.groups.find(g => g.id === groupId);
                 return group ? group.name : 'Unknown';
+            },
+            // Unified Form - Detection & Validation
+            detectAddressType() {
+                const input = this.unifiedForm.address.trim();
+                this.unifiedForm.validationError = '';
+
+                if (!input) {
+                    this.unifiedForm.detectedType = null;
+                    return;
+                }
+
+                if (input.includes('/')) {
+                    this.unifiedForm.detectedType = 'subnet';
+                    if (!this.isValidCIDR(input)) {
+                        this.unifiedForm.validationError = 'Invalid CIDR (e.g., 192.168.1.0/24)';
+                    }
+                    return;
+                }
+
+                if (this.isValidIP(input)) {
+                    this.unifiedForm.detectedType = 'ip';
+                } else {
+                    this.unifiedForm.detectedType = 'ip';
+                    this.unifiedForm.validationError = 'Invalid IP address';
+                }
+            },
+            isValidIP(ip) {
+                const ipv4 = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/;
+                const ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::)$/;
+                return ipv4.test(ip) || ipv6.test(ip);
+            },
+            isValidCIDR(cidr) {
+                const parts = cidr.split('/');
+                if (parts.length !== 2) return false;
+                const prefix = parseInt(parts[1]);
+                if (!this.isValidIP(parts[0])) return false;
+                return parts[0].includes(':') ? (prefix >= 0 && prefix <= 128) : (prefix >= 0 && prefix <= 32);
+            },
+            getTypeLabel() {
+                const labels = {
+                    'ip': 'IP Address → Individual Client',
+                    'subnet': 'CIDR Subnet → Multiple Clients'
+                };
+                return labels[this.unifiedForm.detectedType] || '';
+            },
+            getTypeIcon() {
+                return this.unifiedForm.detectedType === 'subnet' ? 'network' : 'user';
+            },
+            getSubmitButtonColor() {
+                if (!this.unifiedForm.detectedType) return '#6b7280';
+                return this.unifiedForm.detectedType === 'subnet' ? '#10b981' : '#3b82f6';
+            },
+            getSubmitButtonText() {
+                if (!this.unifiedForm.detectedType) return 'Enter address...';
+                return this.unifiedForm.detectedType === 'subnet' ? 'Add Subnet' : 'Add Client';
+            },
+            async submitUnifiedForm() {
+                if (!this.unifiedForm.detectedType) {
+                    alert('Please enter a valid IP address or CIDR subnet');
+                    return;
+                }
+                if (this.unifiedForm.validationError) {
+                    alert(this.unifiedForm.validationError);
+                    return;
+                }
+                try {
+                    if (this.unifiedForm.detectedType === 'subnet') {
+                        await this.submitSubnet();
+                    } else {
+                        await this.submitClient();
+                    }
+                } catch (e) {
+                    console.error('Submission error:', e);
+                }
+            },
+            async submitClient() {
+                const payload = {
+                    ip_address: this.unifiedForm.address,
+                    group_id: this.unifiedForm.group_id || null,
+                    hostname: this.unifiedForm.metadata || null,
+                    mac_address: this.unifiedForm.mac || null
+                };
+                const res = await fetch('/api/clients', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    this.resetUnifiedForm();
+                    await this.loadClients();
+                    alert('Client added successfully!');
+                } else {
+                    const error = await res.text();
+                    alert('Failed: ' + error);
+                }
+            },
+            async submitSubnet() {
+                if (!this.unifiedForm.group_id) {
+                    alert('Group is required for subnets');
+                    return;
+                }
+                const payload = {
+                    subnet_cidr: this.unifiedForm.address,
+                    group_id: parseInt(this.unifiedForm.group_id),
+                    comment: this.unifiedForm.metadata || null
+                };
+                const res = await fetch('/api/client-subnets', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    this.resetUnifiedForm();
+                    await this.loadSubnets();
+                    alert('Subnet added successfully!');
+                } else {
+                    const error = await res.text();
+                    alert('Failed: ' + error);
+                }
+            },
+            resetUnifiedForm() {
+                this.unifiedForm = {
+                    address: '',
+                    group_id: '',
+                    metadata: '',
+                    mac: '',
+                    detectedType: null,
+                    validationError: ''
+                };
             },
             async changeClientGroup(clientId, groupId) {
                 try {
