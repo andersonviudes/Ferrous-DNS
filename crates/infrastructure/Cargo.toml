@@ -41,3 +41,6 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 reqwest.workspace = true
+
+[dev-dependencies]
+tempfile = "3.8"

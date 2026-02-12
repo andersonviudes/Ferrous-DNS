@@ -18,7 +18,7 @@ impl LinuxArpReader {
         }
     }
 
-    #[cfg(test)]
+    /// Create a new LinuxArpReader with a custom ARP file path (useful for testing)
     pub fn with_path(path: String) -> Self {
         Self { arp_path: path }
     }
