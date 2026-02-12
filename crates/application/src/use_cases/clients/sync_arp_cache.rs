@@ -1,7 +1,7 @@
 use crate::ports::{ArpReader, ClientRepository};
 use ferrous_dns_domain::DomainError;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Use case: Synchronize ARP cache with client database
 /// Should be run periodically (e.g., every 60 seconds)
@@ -29,15 +29,11 @@ impl SyncArpCacheUseCase {
 
         debug!(entries = count, "ARP table read successfully");
 
-        let mut updated = 0u64;
-        for (ip, mac) in arp_table {
-            match self.client_repo.update_mac_address(ip, mac).await {
-                Ok(_) => updated += 1,
-                Err(e) => {
-                    warn!(error = %e, ip = %ip, "Failed to update MAC address");
-                }
-            }
-        }
+        // Convert HashMap to Vec for batch update
+        let updates: Vec<_> = arp_table.into_iter().collect();
+
+        // Use batch update for better performance
+        let updated = self.client_repo.batch_update_mac_addresses(updates).await?;
 
         info!(total = count, updated, "ARP cache synchronized");
         Ok(updated)

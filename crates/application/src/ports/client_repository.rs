@@ -17,6 +17,12 @@ pub trait ClientRepository: Send + Sync {
         mac: String,
     ) -> Result<(), DomainError>;
 
+    /// Batch update MAC addresses for multiple clients (more efficient)
+    async fn batch_update_mac_addresses(
+        &self,
+        updates: Vec<(IpAddr, String)>,
+    ) -> Result<u64, DomainError>;
+
     /// Update client's hostname
     async fn update_hostname(
         &self,

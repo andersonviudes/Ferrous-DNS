@@ -134,6 +134,52 @@ impl ClientRepository for SqliteClientRepository {
         Ok(())
     }
 
+    #[instrument(skip(self, updates))]
+    async fn batch_update_mac_addresses(
+        &self,
+        updates: Vec<(IpAddr, String)>,
+    ) -> Result<u64, DomainError> {
+        if updates.is_empty() {
+            return Ok(0);
+        }
+
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            error!(error = %e, "Failed to begin transaction");
+            DomainError::DatabaseError(e.to_string())
+        })?;
+
+        let mut updated_count = 0u64;
+
+        for (ip_address, mac) in updates {
+            let ip_str = ip_address.to_string();
+
+            let result = sqlx::query(
+                "UPDATE clients SET
+                     mac_address = ?,
+                     last_mac_update = CURRENT_TIMESTAMP,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE ip_address = ?"
+            )
+            .bind(&mac)
+            .bind(&ip_str)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!(error = %e, ip = %ip_address, "Failed to update MAC in batch");
+                DomainError::DatabaseError(e.to_string())
+            })?;
+
+            updated_count += result.rows_affected();
+        }
+
+        tx.commit().await.map_err(|e| {
+            error!(error = %e, "Failed to commit batch MAC update");
+            DomainError::DatabaseError(e.to_string())
+        })?;
+
+        Ok(updated_count)
+    }
+
     #[instrument(skip(self))]
     async fn update_hostname(
         &self,
