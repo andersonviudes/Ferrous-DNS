@@ -31,20 +31,12 @@ impl Group {
         }
     }
 
-    pub fn can_disable(&self) -> Result<(), ()> {
-        if self.is_default {
-            Err(())
-        } else {
-            Ok(())
-        }
+    pub fn can_disable(&self) -> bool {
+        !self.is_default
     }
 
-    pub fn can_delete(&self) -> Result<(), ()> {
-        if self.is_default {
-            Err(())
-        } else {
-            Ok(())
-        }
+    pub fn can_delete(&self) -> bool {
+        !self.is_default
     }
 
     pub fn validate_name(name: &str) -> Result<(), String> {
@@ -80,21 +72,10 @@ impl Group {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GroupStats {
     pub total_groups: u64,
     pub enabled_groups: u64,
     pub disabled_groups: u64,
     pub total_clients: u64,
-}
-
-impl Default for GroupStats {
-    fn default() -> Self {
-        Self {
-            total_groups: 0,
-            enabled_groups: 0,
-            disabled_groups: 0,
-            total_clients: 0,
-        }
-    }
 }

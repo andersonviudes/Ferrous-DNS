@@ -21,7 +21,7 @@ pub fn create_api_routes(state: AppState) -> Router {
         // Clients endpoints
         .route("/clients", get(handlers::get_clients))
         .route("/clients/stats", get(handlers::get_client_stats))
-        .route("/clients/:id/group", put(handlers::assign_client_to_group))
+        .route("/clients/{id}/group", put(handlers::assign_client_to_group))
         // Groups endpoints
         .merge(handlers::groups::routes())
         // DNS Settings (Pi-hole style)

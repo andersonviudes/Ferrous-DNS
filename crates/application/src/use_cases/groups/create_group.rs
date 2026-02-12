@@ -19,8 +19,9 @@ impl CreateGroupUseCase {
         name: String,
         comment: Option<String>,
     ) -> Result<Group, DomainError> {
-        Group::validate_name(&name)?;
-        Group::validate_comment(&comment.as_ref().map(|s| Arc::from(s.as_str())))?;
+        Group::validate_name(&name).map_err(DomainError::InvalidGroupName)?;
+        Group::validate_comment(&comment.as_ref().map(|s| Arc::from(s.as_str())))
+            .map_err(DomainError::InvalidGroupName)?;
 
         let group = self.group_repo.create(name.clone(), comment).await?;
 

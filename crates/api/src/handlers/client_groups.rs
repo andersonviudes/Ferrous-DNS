@@ -6,7 +6,10 @@ use axum::{
 use ferrous_dns_domain::DomainError;
 use tracing::error;
 
-use crate::{dto::{AssignGroupRequest, ClientResponse}, state::AppState};
+use crate::{
+    dto::{AssignGroupRequest, ClientResponse},
+    state::AppState,
+};
 
 pub async fn assign_client_to_group(
     State(state): State<AppState>,

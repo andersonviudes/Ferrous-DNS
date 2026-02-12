@@ -14,7 +14,10 @@ fn test_group_creation() {
     assert_eq!(group.id, Some(1));
     assert_eq!(group.name.as_ref(), "Test Group");
     assert!(group.enabled);
-    assert_eq!(group.comment.as_ref().map(|s| s.as_ref()), Some("Test comment"));
+    assert_eq!(
+        group.comment.as_ref().map(|s| s.as_ref()),
+        Some("Test comment")
+    );
     assert!(!group.is_default);
 }
 
@@ -62,25 +65,25 @@ fn test_validate_comment_too_long() {
 #[test]
 fn test_can_disable_regular_group() {
     let group = Group::new(None, Arc::from("Regular"), true, None, false);
-    assert!(group.can_disable().is_ok());
+    assert!(group.can_disable());
 }
 
 #[test]
 fn test_cannot_disable_default_group() {
     let group = Group::new(None, Arc::from("Protected"), true, None, true);
-    assert!(group.can_disable().is_err());
+    assert!(!group.can_disable());
 }
 
 #[test]
 fn test_can_delete_regular_group() {
     let group = Group::new(None, Arc::from("Regular"), true, None, false);
-    assert!(group.can_delete().is_ok());
+    assert!(group.can_delete());
 }
 
 #[test]
 fn test_cannot_delete_default_group() {
     let group = Group::new(None, Arc::from("Protected"), true, None, true);
-    assert!(group.can_delete().is_err());
+    assert!(!group.can_delete());
 }
 
 #[test]
@@ -89,7 +92,9 @@ fn test_default_group_properties() {
         Some(1),
         Arc::from("Protected"),
         true,
-        Some(Arc::from("Default group for all clients. Cannot be disabled or deleted.")),
+        Some(Arc::from(
+            "Default group for all clients. Cannot be disabled or deleted.",
+        )),
         true,
     );
 
@@ -97,6 +102,6 @@ fn test_default_group_properties() {
     assert_eq!(protected_group.name.as_ref(), "Protected");
     assert!(protected_group.enabled);
     assert!(protected_group.is_default);
-    assert!(protected_group.can_disable().is_err());
-    assert!(protected_group.can_delete().is_err());
+    assert!(!protected_group.can_disable());
+    assert!(!protected_group.can_delete());
 }

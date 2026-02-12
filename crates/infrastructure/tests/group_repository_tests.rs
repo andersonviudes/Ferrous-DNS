@@ -1,5 +1,6 @@
+use ferrous_dns_application::ports::GroupRepository;
 use ferrous_dns_infrastructure::repositories::group_repository::SqliteGroupRepository;
-use sqlx::{SqlitePool, SqlitePoolOptions};
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 async fn create_test_db() -> SqlitePool {
     let pool = SqlitePoolOptions::new()
@@ -28,9 +29,13 @@ async fn create_test_db() -> SqlitePool {
         "CREATE TABLE clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ip_address TEXT NOT NULL,
+            mac_address TEXT,
+            hostname TEXT,
             first_seen DATETIME,
             last_seen DATETIME,
             query_count INTEGER DEFAULT 0,
+            last_mac_update DATETIME,
+            last_hostname_update DATETIME,
             group_id INTEGER DEFAULT 1 REFERENCES groups(id) ON DELETE RESTRICT
         )",
     )
@@ -68,7 +73,10 @@ async fn test_create_and_get_group() {
 
     assert_eq!(group.name.as_ref(), "Test Group");
     assert!(group.enabled);
-    assert_eq!(group.comment.as_ref().map(|s| s.as_ref()), Some("Test comment"));
+    assert_eq!(
+        group.comment.as_ref().map(|s| s.as_ref()),
+        Some("Test comment")
+    );
     assert!(!group.is_default);
 
     let fetched = repo.get_by_id(group.id.unwrap()).await.unwrap().unwrap();
@@ -111,13 +119,21 @@ async fn test_update_group() {
     let id = group.id.unwrap();
 
     let updated = repo
-        .update(id, Some("Updated".to_string()), Some(false), Some("New comment".to_string()))
+        .update(
+            id,
+            Some("Updated".to_string()),
+            Some(false),
+            Some("New comment".to_string()),
+        )
         .await
         .unwrap();
 
     assert_eq!(updated.name.as_ref(), "Updated");
     assert!(!updated.enabled);
-    assert_eq!(updated.comment.as_ref().map(|s| s.as_ref()), Some("New comment"));
+    assert_eq!(
+        updated.comment.as_ref().map(|s| s.as_ref()),
+        Some("New comment")
+    );
 }
 
 #[tokio::test]
@@ -167,10 +183,12 @@ async fn test_count_clients_in_group() {
     let repo = SqliteGroupRepository::new(pool.clone());
 
     // Insert clients in Protected group
-    sqlx::query("INSERT INTO clients (ip_address, group_id) VALUES ('192.168.1.1', 1), ('192.168.1.2', 1)")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO clients (ip_address, group_id) VALUES ('192.168.1.1', 1), ('192.168.1.2', 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let count = repo.count_clients_in_group(1).await.unwrap();
     assert_eq!(count, 2);

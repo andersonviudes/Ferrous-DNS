@@ -17,10 +17,10 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/groups", get(get_all_groups))
         .route("/api/groups", post(create_group))
-        .route("/api/groups/:id", get(get_group_by_id))
-        .route("/api/groups/:id", put(update_group))
-        .route("/api/groups/:id", delete(delete_group))
-        .route("/api/groups/:id/clients", get(get_group_clients))
+        .route("/api/groups/{id}", get(get_group_by_id))
+        .route("/api/groups/{id}", put(update_group))
+        .route("/api/groups/{id}", delete(delete_group))
+        .route("/api/groups/{id}/clients", get(get_group_clients))
 }
 
 async fn get_all_groups(State(state): State<AppState>) -> Json<Vec<GroupResponse>> {

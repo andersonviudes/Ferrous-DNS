@@ -10,7 +10,36 @@ async fn create_test_db() -> sqlx::SqlitePool {
         .await
         .unwrap();
 
-    // Run migration
+    // Create groups table first
+    sqlx::query(
+        r#"
+        CREATE TABLE groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            comment TEXT,
+            is_default BOOLEAN NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Insert Protected group
+    sqlx::query(
+        r#"
+        INSERT INTO groups (id, name, enabled, comment, is_default)
+        VALUES (1, 'Protected', 1, 'Default group for all clients. Cannot be disabled or deleted.', 1)
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Create clients table with group_id foreign key
     sqlx::query(
         r#"
         CREATE TABLE clients (
@@ -23,6 +52,7 @@ async fn create_test_db() -> sqlx::SqlitePool {
             query_count INTEGER NOT NULL DEFAULT 0,
             last_mac_update DATETIME,
             last_hostname_update DATETIME,
+            group_id INTEGER NOT NULL DEFAULT 1 REFERENCES groups(id) ON DELETE RESTRICT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )

@@ -31,11 +31,12 @@ impl UpdateGroupUseCase {
             )))?;
 
         if let Some(ref n) = name {
-            Group::validate_name(n)?;
+            Group::validate_name(n).map_err(DomainError::InvalidGroupName)?;
         }
 
         if let Some(ref c) = comment {
-            Group::validate_comment(&Some(Arc::from(c.as_str())))?;
+            Group::validate_comment(&Some(Arc::from(c.as_str())))
+                .map_err(DomainError::InvalidGroupName)?;
         }
 
         if enabled == Some(false) && group.is_default {

@@ -22,14 +22,14 @@ impl AssignClientGroupUseCase {
 
     #[instrument(skip(self))]
     pub async fn execute(&self, client_id: i64, group_id: i64) -> Result<Client, DomainError> {
-        let group = self
-            .group_repo
-            .get_by_id(group_id)
-            .await?
-            .ok_or(DomainError::GroupNotFound(format!(
-                "Group {} not found",
-                group_id
-            )))?;
+        let group =
+            self.group_repo
+                .get_by_id(group_id)
+                .await?
+                .ok_or(DomainError::GroupNotFound(format!(
+                    "Group {} not found",
+                    group_id
+                )))?;
 
         let _client = self
             .client_repo
@@ -49,18 +49,16 @@ impl AssignClientGroupUseCase {
             );
         }
 
-        self.client_repo
-            .assign_group(client_id, group_id)
-            .await?;
+        self.client_repo.assign_group(client_id, group_id).await?;
 
-        let updated_client = self
-            .client_repo
-            .get_by_id(client_id)
-            .await?
-            .ok_or(DomainError::NotFound(format!(
-                "Client {} not found after update",
-                client_id
-            )))?;
+        let updated_client =
+            self.client_repo
+                .get_by_id(client_id)
+                .await?
+                .ok_or(DomainError::NotFound(format!(
+                    "Client {} not found after update",
+                    client_id
+                )))?;
 
         info!(
             client_id = client_id,
