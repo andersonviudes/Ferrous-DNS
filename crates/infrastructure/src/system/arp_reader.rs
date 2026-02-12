@@ -6,6 +6,33 @@ use std::str::FromStr;
 use tokio::fs;
 use tracing::{debug, warn};
 
+/// Validate MAC address format
+/// Accepts formats: aa:bb:cc:dd:ee:ff or aa-bb-cc-dd-ee-ff
+fn is_valid_mac(mac: &str) -> bool {
+    // MAC address: 6 pairs of hex digits separated by : or -
+    // Example: aa:bb:cc:dd:ee:ff or AA-BB-CC-DD-EE-FF
+    if mac.len() != 17 {
+        return false;
+    }
+
+    let separator = if mac.contains(':') {
+        ':'
+    } else if mac.contains('-') {
+        '-'
+    } else {
+        return false;
+    };
+
+    let parts: Vec<&str> = mac.split(separator).collect();
+    if parts.len() != 6 {
+        return false;
+    }
+
+    parts
+        .iter()
+        .all(|part| part.len() == 2 && part.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
 /// Linux ARP cache reader (reads /proc/net/arp)
 pub struct LinuxArpReader {
     arp_path: String,
@@ -60,6 +87,12 @@ impl ArpReader for LinuxArpReader {
             // Check if entry is complete (0x2 = COMPLETE)
             // Incomplete entries have MAC "00:00:00:00:00:00"
             if flags != "0x2" || mac == "00:00:00:00:00:00" {
+                continue;
+            }
+
+            // Validate MAC address format
+            if !is_valid_mac(mac) {
+                warn!(ip = ip_str, mac = mac, "Invalid MAC address format in ARP table");
                 continue;
             }
 
