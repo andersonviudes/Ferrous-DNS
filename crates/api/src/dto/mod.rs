@@ -1,6 +1,7 @@
 pub mod blocklist;
 pub mod cache;
 pub mod client;
+pub mod client_subnet;
 pub mod config;
 pub mod group;
 pub mod hostname;
@@ -13,6 +14,9 @@ pub use local_record::{CreateLocalRecordRequest, LocalRecordDto};
 pub use blocklist::BlocklistResponse;
 pub use cache::{CacheMetricsResponse, CacheStatsResponse};
 pub use client::{ClientResponse, ClientStatsResponse, ClientsQuery};
+pub use client_subnet::{
+    ClientSubnetResponse, CreateClientSubnetRequest, CreateManualClientRequest,
+};
 pub use config::*;
 pub use group::{AssignGroupRequest, CreateGroupRequest, GroupResponse, UpdateGroupRequest};
 pub use hostname::HostnameResponse;

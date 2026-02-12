@@ -1,12 +1,14 @@
 pub mod blocklist;
 pub mod cache;
 pub mod client_groups;
+pub mod client_subnets;
 pub mod clients;
 pub mod config;
 pub mod groups;
 pub mod health;
 pub mod hostname;
 pub mod local_records;
+pub mod manual_clients;
 pub mod queries;
 pub mod stats;
 
@@ -17,6 +19,7 @@ pub use clients::{get_client_stats, get_clients};
 pub use config::{get_config, get_settings, reload_config, update_config, update_settings};
 pub use health::health_check;
 pub use hostname::get_hostname;
+pub use manual_clients::create_manual_client;
 pub use queries::get_queries;
 pub use stats::get_stats;
 pub mod upstream;
