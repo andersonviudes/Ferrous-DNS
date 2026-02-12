@@ -35,12 +35,15 @@ jobs:
             docs
             style
             refactor
+            refactore
             perf
             test
             chore
             ci
             build
           requireScope: false
+          headerPattern: '^(\w+)(\s-\s)(.+)$'
+          headerPatternCorrespondence: 'type, separator, subject'
 
   # ============================================================================
   # Check for Breaking Changes
