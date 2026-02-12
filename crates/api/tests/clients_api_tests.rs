@@ -4,14 +4,18 @@ use axum::{
     Router,
 };
 use ferrous_dns_api::{create_api_routes, AppState};
-use ferrous_dns_application::use_cases::{
-    GetBlocklistUseCase, GetClientsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
+use ferrous_dns_application::{
+    ports::ClientRepository,
+    use_cases::{
+        GetBlocklistUseCase, GetClientsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
+    },
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::{
     dns::{cache::DnsCache, HickoryDnsResolver},
     repositories::client_repository::SqliteClientRepository,
 };
+use http_body_util::BodyExt;
 use serde_json::Value;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::net::IpAddr;
@@ -50,21 +54,29 @@ async fn create_test_db() -> sqlx::SqlitePool {
     pool
 }
 
-async fn create_test_app() -> (Router, Arc<SqliteClientRepository>) {
+async fn create_test_app() -> (Router, Arc<SqliteClientRepository>, sqlx::SqlitePool) {
     let pool = create_test_db().await;
-    let client_repo = Arc::new(SqliteClientRepository::new(pool));
+    let client_repo = Arc::new(SqliteClientRepository::new(pool.clone()));
 
     // Create minimal AppState for testing
     let config = Arc::new(RwLock::new(Config::default()));
     let cache = Arc::new(DnsCache::new(
         0,
-        Default::default(),
+        ferrous_dns_infrastructure::dns::EvictionStrategy::LRU,
         0.0,
         0.0,
         0,
         0.0,
         false,
     ));
+
+    // Create a minimal DNS resolver setup
+    use ferrous_dns_infrastructure::dns::{PoolManager, QueryEventEmitter};
+    let event_emitter = QueryEventEmitter::new_disabled();
+    let pool_manager = Arc::new(
+        PoolManager::new(vec![], None, event_emitter)
+            .expect("Failed to create PoolManager"),
+    );
 
     // Note: These use cases won't be called in client tests, but needed for AppState
     // In a real scenario, you'd mock these properly
@@ -80,23 +92,23 @@ async fn create_test_app() -> (Router, Arc<SqliteClientRepository>) {
             ),
         ))),
         get_blocklist: Arc::new(GetBlocklistUseCase::new(Arc::new(
-            ferrous_dns_infrastructure::repositories::blocklist_repository::SqliteBlocklistRepository::new(),
+            ferrous_dns_infrastructure::repositories::blocklist_repository::SqliteBlocklistRepository::new(pool.clone()),
         ))),
         get_clients: Arc::new(GetClientsUseCase::new(client_repo.clone())),
         config,
         cache,
         dns_resolver: Arc::new(
-            HickoryDnsResolver::new_with_system_config(5000, false, None).unwrap(),
+            HickoryDnsResolver::new_with_pools(pool_manager, 5000, false, None).unwrap(),
         ),
     };
 
     let app = create_api_routes(state);
-    (app, client_repo)
+    (app, client_repo, pool)
 }
 
 #[tokio::test]
 async fn test_get_clients_empty() {
-    let (app, _repo) = create_test_app().await;
+    let (app, _repo, _pool) = create_test_app().await;
 
     let response = app
         .oneshot(
@@ -110,7 +122,7 @@ async fn test_get_clients_empty() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     assert!(json.is_array());
@@ -119,7 +131,7 @@ async fn test_get_clients_empty() {
 
 #[tokio::test]
 async fn test_get_clients_with_data() {
-    let (app, repo) = create_test_app().await;
+    let (app, repo, _pool) = create_test_app().await;
 
     // Add test data
     let ip1: IpAddr = "192.168.1.100".parse().unwrap();
@@ -146,7 +158,7 @@ async fn test_get_clients_with_data() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     assert!(json.is_array());
@@ -166,7 +178,7 @@ async fn test_get_clients_with_data() {
 
 #[tokio::test]
 async fn test_get_clients_with_pagination() {
-    let (app, repo) = create_test_app().await;
+    let (app, repo, _pool) = create_test_app().await;
 
     // Add 10 clients
     for i in 1..=10 {
@@ -187,7 +199,7 @@ async fn test_get_clients_with_pagination() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(json.as_array().unwrap().len(), 5);
 
@@ -203,14 +215,14 @@ async fn test_get_clients_with_pagination() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(json.as_array().unwrap().len(), 5);
 }
 
 #[tokio::test]
 async fn test_get_client_stats() {
-    let (app, repo) = create_test_app().await;
+    let (app, repo, _pool) = create_test_app().await;
 
     // Add test data
     for i in 1..=5 {
@@ -242,7 +254,7 @@ async fn test_get_client_stats() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(json["total_clients"], 5);
@@ -254,7 +266,7 @@ async fn test_get_client_stats() {
 
 #[tokio::test]
 async fn test_get_clients_json_structure() {
-    let (app, repo) = create_test_app().await;
+    let (app, repo, _pool) = create_test_app().await;
 
     // Add a client with all fields populated
     let ip: IpAddr = "192.168.1.100".parse().unwrap();
@@ -276,7 +288,7 @@ async fn test_get_clients_json_structure() {
         .await
         .unwrap();
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     let client = &json.as_array().unwrap()[0];
@@ -293,7 +305,7 @@ async fn test_get_clients_json_structure() {
 
 #[tokio::test]
 async fn test_get_clients_with_active_days_filter() {
-    let (app, repo) = create_test_app().await;
+    let (app, repo, pool) = create_test_app().await;
 
     // Add clients
     for i in 1..=5 {
@@ -302,7 +314,6 @@ async fn test_get_clients_with_active_days_filter() {
     }
 
     // Make some clients old
-    let pool = create_test_db().await;
     sqlx::query(
         "UPDATE clients SET last_seen = datetime('now', '-31 days') WHERE ip_address = '192.168.1.1'",
     )
@@ -322,7 +333,7 @@ async fn test_get_clients_with_active_days_filter() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     // Should return only active clients (this test is approximate due to test setup)
