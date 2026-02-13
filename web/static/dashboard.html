@@ -521,19 +521,20 @@
                             bucketsReceived: timeline.buckets.length
                         });
 
-                        // Update chart with total queries
-                        // Future: Can add stacked chart with blocked/unblocked datasets
-                        if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.data.datasets[0]) {
+                        // Update chart with blocked and unblocked queries (stacked)
+                        if (appCharts.timeline && appCharts.timeline.data &&
+                            appCharts.timeline.data.datasets[0] && appCharts.timeline.data.datasets[1]) {
                             appCharts.timeline.data.labels = timeLabels;
-                            appCharts.timeline.data.datasets[0].data = totalCounts;
+                            appCharts.timeline.data.datasets[0].data = blockedCounts;    // Red area
+                            appCharts.timeline.data.datasets[1].data = unblockedCounts;  // Blue area
                             appCharts.timeline.update('none');
-                            console.log('⏰ Timeline chart updated successfully with', totalCounts.length, 'data points (15-min intervals)');
+                            console.log('⏰ Timeline chart updated successfully with', totalCounts.length, 'data points (blocked + unblocked stacked)');
                         } else {
                             console.log('⏰ Timeline chart not ready:', {
                                 hasChart: !!appCharts.timeline,
                                 hasData: appCharts.timeline?.data ? true : false,
                                 hasCanvas: appCharts.timeline?.canvas ? true : false,
-                                hasDatasets: appCharts.timeline?.data?.datasets?.[0] ? true : false
+                                hasDatasets: appCharts.timeline?.data?.datasets ? appCharts.timeline.data.datasets.length : 0
                             });
                         }
                     }
@@ -681,13 +682,22 @@
                                     return mins === 0 ? `${Math.floor(i/4)}:00` : '';
                                 }),
                                 datasets: [{
-                                    label: 'Total Queries',
+                                    label: 'Blocked',
                                     data: Array(96).fill(0),
-                                    borderColor: '#3B82F6',
-                                    backgroundColor: 'rgba(59,130,246,0.1)',
+                                    borderColor: '#EF4444',
+                                    backgroundColor: 'rgba(239,68,68,0.5)',
                                     fill: true,
                                     tension: 0.4,
-                                    pointRadius: 1,  // Smaller points for 96 data points
+                                    pointRadius: 1,
+                                    pointHoverRadius: 3
+                                }, {
+                                    label: 'Unblocked',
+                                    data: Array(96).fill(0),
+                                    borderColor: '#3B82F6',
+                                    backgroundColor: 'rgba(59,130,246,0.5)',
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 1,
                                     pointHoverRadius: 3
                                 }]
                             },
@@ -712,8 +722,12 @@
                                     }
                                 },
                                 scales: {
-                                    y: {beginAtZero: true},
+                                    y: {
+                                        beginAtZero: true,
+                                        stacked: true  // Stack blocked + unblocked
+                                    },
                                     x: {
+                                        stacked: true,  // Enable stacking
                                         ticks: {
                                             maxRotation: 0,
                                             autoSkip: false,  // Don't skip labels - we control which ones to show
