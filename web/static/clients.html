@@ -700,10 +700,10 @@
                 error: ''
             },
 
-            init() {
+            async init() {
                 this.theme = localStorage.getItem('theme') || 'light';
                 document.documentElement.classList.toggle('dark', this.theme === 'dark');
-                this.loadAll();
+                await this.loadAll();
                 setTimeout(() => lucide.createIcons(), 100);
                 this.startPolling();
             },
@@ -907,6 +907,7 @@
                 if (res.ok) {
                     this.resetForm();
                     await this.loadAll();
+                    setTimeout(() => lucide.createIcons(), 50);
                     alert('Client added successfully!');
                 } else {
                     const error = await res.text();
@@ -928,6 +929,7 @@
                 if (res.ok) {
                     this.resetForm();
                     await this.loadAll();
+                    setTimeout(() => lucide.createIcons(), 50);
                     alert('Subnet added successfully!');
                 } else {
                     const error = await res.text();
@@ -951,6 +953,7 @@
                     const res = await fetch(`/api/clients/${id}`, {method: 'DELETE'});
                     if (res.ok) {
                         await this.loadAll();
+                        setTimeout(() => lucide.createIcons(), 50);
                         alert('Client deleted!');
                     } else {
                         alert('Failed: ' + await res.text());
@@ -967,6 +970,7 @@
                     const res = await fetch(`/api/client-subnets/${id}`, {method: 'DELETE'});
                     if (res.ok) {
                         await this.loadAll();
+                        setTimeout(() => lucide.createIcons(), 50);
                         alert('Subnet deleted!');
                     } else {
                         alert('Failed: ' + await res.text());
