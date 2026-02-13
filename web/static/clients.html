@@ -701,10 +701,16 @@
             },
 
             async init() {
+                console.log('🚀 Alpine.js init() called');
                 this.theme = localStorage.getItem('theme') || 'light';
                 document.documentElement.classList.toggle('dark', this.theme === 'dark');
+                console.log('📡 Loading all data...');
                 await this.loadAll();
-                setTimeout(() => lucide.createIcons(), 100);
+                console.log('✅ Data loaded, initializing Lucide icons...');
+                setTimeout(() => {
+                    lucide.createIcons();
+                    console.log('✅ Lucide icons initialized');
+                }, 100);
                 this.startPolling();
             },
 
@@ -948,18 +954,27 @@
             },
 
             async deleteClient(id) {
-                if (!confirm('Delete this client?')) return;
+                console.log('🗑️ deleteClient called with id:', id);
+                if (!confirm('Delete this client?')) {
+                    console.log('❌ User cancelled delete');
+                    return;
+                }
                 try {
+                    console.log('📡 Sending DELETE request to /api/clients/' + id);
                     const res = await fetch(`/api/clients/${id}`, {method: 'DELETE'});
+                    console.log('📡 Response status:', res.status);
                     if (res.ok) {
+                        console.log('✅ Delete successful, reloading data...');
                         await this.loadAll();
                         setTimeout(() => lucide.createIcons(), 50);
                         alert('Client deleted!');
                     } else {
-                        alert('Failed: ' + await res.text());
+                        const errorText = await res.text();
+                        console.error('❌ Delete failed:', errorText);
+                        alert('Failed: ' + errorText);
                     }
                 } catch (e) {
-                    console.error(e);
+                    console.error('💥 Exception during delete:', e);
                     alert('Error deleting client');
                 }
             },
@@ -1007,9 +1022,14 @@
 
             async bulkDeleteClients() {
                 const count = this.selectedClients.length;
-                if (count === 0) return;
+                console.log('🗑️ bulkDeleteClients called, count:', count, 'ids:', this.selectedClients);
+                if (count === 0) {
+                    console.log('⚠️ No clients selected');
+                    return;
+                }
 
                 if (!confirm(`Delete ${count} selected client${count > 1 ? 's' : ''}? This action cannot be undone.`)) {
+                    console.log('❌ User cancelled bulk delete');
                     return;
                 }
 
