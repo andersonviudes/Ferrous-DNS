@@ -219,6 +219,9 @@
         <div class="status-item">
             <div class="status-indicator"></div>
             <span>Active</span></div>
+        <div class="status-item"><i data-lucide="clock" style="width:14px;height:14px;" :style="'color:' + getRateColor()"></i><span
+                x-text="queryRate.rate || '0 q/s'">0 q/s</span>
+        </div>
         <div class="status-item"><i data-lucide="package" style="width:14px;height:14px;color:var(--text-secondary)"></i><span id="queries-min"
                                                                                                x-text="stats.queries_total||0+' q/total'">0 q/total</span>
         </div>
@@ -361,11 +364,12 @@
         return {
             theme: 'light',
             stats: {},
+            queryRate: {queries: 0, rate: '0 q/s'},
             cacheMetrics: {},
             cacheStats: {cache: 0, upstream: 0},
             queryTypes: {},
             chartsReady: false,
-            pollingIntervals: {fast: null, slow: null},
+            pollingIntervals: {fast: null, slow: null, rate: null},
             async init() {
                 this.theme = localStorage.getItem('theme') || 'light';
                 document.documentElement.classList.toggle('dark', this.theme === 'dark');
@@ -394,7 +398,7 @@
                 setTimeout(() => lucide.createIcons(), 50)
             },
             async loadAllData() {
-                await Promise.all([this.loadStats(), this.loadQueryTypes(), this.loadCacheMetrics()])
+                await Promise.all([this.loadStats(), this.loadQueryRate(), this.loadQueryTypes(), this.loadCacheMetrics()])
             },
             async loadQuickStats() {
                 // Only load stats and cache metrics (no chart updates)
@@ -412,6 +416,23 @@
                 } catch (e) {
                     console.error(e)
                 }
+            },
+            async loadQueryRate() {
+                try {
+                    const res = await fetch('/api/stats/rate?unit=second');
+                    if (res.ok) {
+                        this.queryRate = await res.json();
+                        console.log('⚡ Query rate:', this.queryRate);
+                    }
+                } catch (e) {
+                    console.error('Error loading query rate:', e);
+                }
+            },
+            getRateColor() {
+                const queries = this.queryRate.queries || 0;
+                if (queries >= 10000) return '#EF4444'; // Red for > 10k q/s
+                if (queries >= 1000) return '#F59E0B';  // Yellow for 1k-10k q/s
+                return '#10B981';                        // Green for < 1k q/s
             },
             async loadQueryTypes() {
                 try {
@@ -780,6 +801,11 @@
                 }
             },
             startPolling() {
+                // Rate polling: Query rate every 1 second
+                this.pollingIntervals.rate = setInterval(() => {
+                    this.loadQueryRate()
+                }, 1000);
+
                 // Fast polling: Stats and cache metrics every 1 second
                 this.pollingIntervals.fast = setInterval(() => {
                     this.loadQuickStats()
@@ -791,6 +817,7 @@
                 }, 60000);
             },
             stopPolling() {
+                if (this.pollingIntervals.rate) clearInterval(this.pollingIntervals.rate);
                 if (this.pollingIntervals.fast) clearInterval(this.pollingIntervals.fast);
                 if (this.pollingIntervals.slow) clearInterval(this.pollingIntervals.slow);
             },
