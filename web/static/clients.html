@@ -266,6 +266,35 @@
             color: white;
             border-radius: 8px
         }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--border-color)
+        }
+
+        .tab {
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s
+        }
+
+        .tab:hover {
+            color: var(--text-primary)
+        }
+
+        .tab.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary)
+        }
     </style>
 </head>
 
@@ -426,76 +455,129 @@
         </form>
     </div>
 
-    <!-- CONFIGURED CLIENTS -->
+    <!-- TABS -->
     <div class="card">
-        <h3 style="font-size:18px;font-weight:600;margin-bottom:16px">Configured Clients</h3>
-
-        <div x-show="manualClients.length === 0" style="padding:32px;text-align:center;color:var(--text-secondary)">
-            No manual clients yet
+        <div class="tabs">
+            <button @click="activeTab = 'known-clients'" class="tab" :class="{'active': activeTab === 'known-clients'}">
+                👥 Known Clients (<span x-text="clients.length">0</span>)
+            </button>
+            <button @click="activeTab = 'configured'" class="tab" :class="{'active': activeTab === 'configured'}">
+                ⚙️ Configured (<span x-text="manualClients.length + subnets.length">0</span>)
+            </button>
         </div>
 
-        <table x-show="manualClients.length > 0" class="table">
-            <thead>
-                <tr>
-                    <th>IP Address</th>
-                    <th>Hostname</th>
-                    <th>MAC Address</th>
-                    <th>Group</th>
-                    <th>Added</th>
-                    <th style="text-align:center">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="c in manualClients" :key="c.id">
+        <!-- TAB: KNOWN CLIENTS -->
+        <div x-show="activeTab === 'known-clients'">
+            <div x-show="clients.length === 0" style="padding:32px;text-align:center;color:var(--text-secondary)">
+                No clients discovered yet
+            </div>
+
+            <table x-show="clients.length > 0" class="table">
+                <thead>
                     <tr>
-                        <td class="monospace" x-text="c.ip_address"></td>
-                        <td x-text="c.hostname || '-'"></td>
-                        <td class="monospace" x-text="c.mac_address || '-'"></td>
-                        <td x-text="getGroupName(c.group_id)"></td>
-                        <td x-text="formatDateTime(c.first_seen)"></td>
-                        <td style="text-align:center">
-                            <button @click="deleteClient(c.id)" style="color:var(--color-error);background:none;border:none;cursor:pointer;padding:4px 8px">
-                                Delete
-                            </button>
-                        </td>
+                        <th>IP Address</th>
+                        <th>Hostname</th>
+                        <th>MAC Address</th>
+                        <th>Group</th>
+                        <th>First Seen</th>
+                        <th>Last Seen</th>
+                        <th>Queries</th>
                     </tr>
-                </template>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- CONFIGURED SUBNETS -->
-    <div class="card">
-        <h3 style="font-size:18px;font-weight:600;margin-bottom:16px">Configured Subnets</h3>
-
-        <div x-show="subnets.length === 0" style="padding:32px;text-align:center;color:var(--text-secondary)">
-            No subnets configured yet
+                </thead>
+                <tbody>
+                    <template x-for="c in clients" :key="c.id">
+                        <tr>
+                            <td class="monospace" x-text="c.ip_address"></td>
+                            <td x-text="c.hostname || '-'"></td>
+                            <td class="monospace" x-text="c.mac_address || '-'"></td>
+                            <td x-text="getGroupName(c.group_id)"></td>
+                            <td x-text="formatDateTime(c.first_seen)"></td>
+                            <td x-text="formatDateTime(c.last_seen)"></td>
+                            <td x-text="c.query_count || 0"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
 
-        <table x-show="subnets.length > 0" class="table">
-            <thead>
-                <tr>
-                    <th>Subnet CIDR</th>
-                    <th>Group</th>
-                    <th>Comment</th>
-                    <th style="text-align:center">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="s in subnets" :key="s.id">
-                    <tr>
-                        <td class="monospace" x-text="s.subnet_cidr"></td>
-                        <td x-text="getGroupName(s.group_id)"></td>
-                        <td x-text="s.comment || '-'"></td>
-                        <td style="text-align:center">
-                            <button @click="deleteSubnet(s.id)" style="color:var(--color-error);background:none;border:none;cursor:pointer;padding:4px 8px">
-                                Delete
-                            </button>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
+        <!-- TAB: CONFIGURED -->
+        <div x-show="activeTab === 'configured'">
+            <!-- Configured Clients -->
+            <div style="margin-bottom:24px">
+                <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;padding:12px 16px;background:var(--bg-tertiary);border-radius:8px">
+                    Individual Clients
+                </h3>
+
+                <div x-show="manualClients.length === 0" style="padding:32px;text-align:center;color:var(--text-secondary)">
+                    No manual clients yet
+                </div>
+
+                <table x-show="manualClients.length > 0" class="table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Hostname</th>
+                            <th>MAC Address</th>
+                            <th>Group</th>
+                            <th>Added</th>
+                            <th style="text-align:center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="c in manualClients" :key="c.id">
+                            <tr>
+                                <td class="monospace" x-text="c.ip_address"></td>
+                                <td x-text="c.hostname || '-'"></td>
+                                <td class="monospace" x-text="c.mac_address || '-'"></td>
+                                <td x-text="getGroupName(c.group_id)"></td>
+                                <td x-text="formatDateTime(c.first_seen)"></td>
+                                <td style="text-align:center">
+                                    <button @click="deleteClient(c.id)" style="color:var(--color-error);background:none;border:none;cursor:pointer;padding:4px 8px">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Configured Subnets -->
+            <div>
+                <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;padding:12px 16px;background:var(--bg-tertiary);border-radius:8px">
+                    Subnets
+                </h3>
+
+                <div x-show="subnets.length === 0" style="padding:32px;text-align:center;color:var(--text-secondary)">
+                    No subnets configured yet
+                </div>
+
+                <table x-show="subnets.length > 0" class="table">
+                    <thead>
+                        <tr>
+                            <th>Subnet CIDR</th>
+                            <th>Group</th>
+                            <th>Comment</th>
+                            <th style="text-align:center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="s in subnets" :key="s.id">
+                            <tr>
+                                <td class="monospace" x-text="s.subnet_cidr"></td>
+                                <td x-text="getGroupName(s.group_id)"></td>
+                                <td x-text="s.comment || '-'"></td>
+                                <td style="text-align:center">
+                                    <button @click="deleteSubnet(s.id)" style="color:var(--color-error);background:none;border:none;cursor:pointer;padding:4px 8px">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
 </main>
@@ -504,6 +586,7 @@
     function app() {
         return {
             theme: 'light',
+            activeTab: 'known-clients',
             clients: [],
             manualClients: [],
             groups: [],
@@ -560,7 +643,8 @@
                     const res = await fetch('/api/clients?limit=1000');
                     if (res.ok) {
                         const all = await res.json();
-                        this.manualClients = all.filter(c => c.hostname || c.mac_address);
+                        // For now, show all clients (ideally backend would have is_manual flag)
+                        this.manualClients = all;
                     }
                 } catch (e) {
                     console.error('Failed to load manual clients:', e);
