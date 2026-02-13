@@ -433,7 +433,7 @@
                         <span x-text="getTypeLabel()"></span>
                     </div>
 
-                    <form @submit.prevent="console.log('📝 FORM SUBMIT EVENT!'); submitUnifiedForm()" style="display:flex;flex-direction:column;gap:16px">
+                    <form @submit.prevent="submitUnifiedForm()" style="display:flex;flex-direction:column;gap:16px">
                         <!-- Address Input with Autocomplete -->
                         <div style="position:relative">
                             <label class="form-label" style="font-size:14px;font-weight:500;color:var(--text-primary);display:block;margin-bottom:6px">
@@ -511,7 +511,6 @@
 
                         <!-- Submit Button -->
                         <button type="submit"
-                                @click="console.log('🖱️ BUTTON CLICKED! detectedType:', unifiedForm.detectedType)"
                                 :disabled="!unifiedForm.detectedType || unifiedForm.detectedType === 'mac' || unifiedForm.validationError"
                                 class="btn btn-primary"
                                 :style="'padding:10px 16px;color:white;border:none;border-radius:8px;font-weight:500;cursor:pointer;margin-top:8px;font-size:14px;background:' + getSubmitButtonColor() + ';opacity:' + (!unifiedForm.detectedType || unifiedForm.detectedType === 'mac' || unifiedForm.validationError ? '0.5' : '1')">
@@ -622,17 +621,7 @@
     </div>
 </main>
 <script>
-    // Global error handler to catch silent errors
-    window.onerror = function(msg, url, lineNo, columnNo, error) {
-        console.error('🚨 GLOBAL ERROR:', msg, 'at line', lineNo);
-        console.error('Error object:', error);
-        return false;
-    };
-
-    console.log('✅ Script loaded - app() function will be defined');
-
     function app() {
-        console.log('🏗️ app() function called - creating Alpine instance');
         return {
             theme: 'light',
             activeTab: 'known-clients',
@@ -658,11 +647,10 @@
                 with_mac: 0,
                 with_hostname: 0
             },
-            async init() {
-                console.log('🔧 Alpine.js init() called - app is initializing!');
+            init() {
                 this.theme = localStorage.getItem('theme') || 'light';
                 document.documentElement.classList.toggle('dark', this.theme === 'dark');
-                await this.loadAllData();
+                this.loadAllData();
                 setTimeout(() => lucide.createIcons(), 100);
                 this.startPolling()
             },
@@ -890,39 +878,27 @@
                 this.filteredKnownClients = [];
             },
             async submitUnifiedForm() {
-                console.log('🚀 submitUnifiedForm CALLED!');
-                console.log('detectedType:', this.unifiedForm.detectedType);
-                console.log('validationError:', this.unifiedForm.validationError);
-
                 if (!this.unifiedForm.detectedType) {
-                    console.log('❌ BLOCKED: No detected type');
                     alert('Please enter a valid IP address, CIDR subnet, or MAC address');
                     return;
                 }
                 if (this.unifiedForm.detectedType === 'mac') {
-                    console.log('❌ BLOCKED: MAC detected');
                     alert('MAC address detected! Please also enter the IP address, or select an existing client.');
                     return;
                 }
                 if (this.unifiedForm.validationError) {
-                    console.log('❌ BLOCKED: Validation error:', this.unifiedForm.validationError);
                     alert(this.unifiedForm.validationError);
                     return;
                 }
 
-                console.log('✅ Proceeding to submit...');
-                console.log('Type:', this.unifiedForm.detectedType);
-
                 try {
                     if (this.unifiedForm.detectedType === 'subnet') {
-                        console.log('📡 Calling submitSubnet()');
                         await this.submitSubnet();
                     } else {
-                        console.log('📡 Calling submitClient()');
                         await this.submitClient();
                     }
                 } catch (e) {
-                    console.error('💥 Submission error:', e);
+                    console.error('Submission error:', e);
                     alert('Error: ' + e.message);
                 }
             },
