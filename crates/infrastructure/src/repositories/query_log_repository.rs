@@ -389,17 +389,23 @@ impl QueryLogRepository for SqliteQueryLogRepository {
             "Fetching query timeline"
         );
 
-        // Build dynamic strftime format based on granularity
-        let time_format = match granularity {
-            "minute" => "%Y-%m-%d %H:%M:00",
-            "hour" => "%Y-%m-%d %H:00:00",
-            "day" => "%Y-%m-%d 00:00:00",
-            _ => "%Y-%m-%d %H:00:00", // default to hour
+        // Build dynamic time bucket expression based on granularity
+        let time_bucket_expr = match granularity {
+            "minute" => "strftime('%Y-%m-%d %H:%M:00', created_at)".to_string(),
+            "quarter_hour" => {
+                // Round minutes to nearest 15 (00, 15, 30, 45)
+                "strftime('%Y-%m-%d %H:', created_at) || \
+                 printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 15) * 15) || \
+                 ':00'".to_string()
+            },
+            "hour" => "strftime('%Y-%m-%d %H:00:00', created_at)".to_string(),
+            "day" => "strftime('%Y-%m-%d 00:00:00', created_at)".to_string(),
+            _ => "strftime('%Y-%m-%d %H:00:00', created_at)".to_string(), // default to hour
         };
 
         let sql = format!(
             "SELECT
-                strftime('{}', created_at) as time_bucket,
+                {} as time_bucket,
                 COUNT(*) as total,
                 SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) as blocked,
                 SUM(CASE WHEN blocked = 0 THEN 1 ELSE 0 END) as unblocked
@@ -407,7 +413,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
              WHERE created_at >= datetime('now', '-' || ? || ' hours')
              GROUP BY time_bucket
              ORDER BY time_bucket ASC",
-            time_format
+            time_bucket_expr
         );
 
         let rows = sqlx::query(&sql)

@@ -23,6 +23,8 @@ pub async fn get_timeline(
     // Parse granularity
     let granularity = match params.granularity.as_str() {
         "minute" => Granularity::Minute,
+        "15min" | "quarter_hour" => Granularity::QuarterHour,
+        "hour" => Granularity::Hour,
         "day" => Granularity::Day,
         _ => Granularity::Hour,
     };

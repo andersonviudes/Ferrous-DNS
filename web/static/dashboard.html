@@ -458,15 +458,15 @@
                 }
 
                 try {
-                    // Request 24 hours of data grouped by hour from backend
-                    const res = await fetch('/api/queries/timeline?period=24h&granularity=hour');
+                    // Request 24 hours of data grouped in 15-minute intervals from backend
+                    const res = await fetch('/api/queries/timeline?period=24h&granularity=15min');
                     if (res.ok) {
                         const timeline = await res.json();
                         console.log('⏰ Timeline data received:', timeline);
 
-                        // Generate 24-hour labels for the last 24 hours
+                        // Generate 24-hour labels for the last 24 hours in 15-min intervals (96 data points)
                         const now = new Date();
-                        const hourLabels = [];
+                        const timeLabels = [];
                         const totalCounts = [];
                         const blockedCounts = [];
                         const unblockedCounts = [];
@@ -481,20 +481,28 @@
                             });
                         });
 
-                        // Generate last 24 hours of labels and data
-                        for (let i = 23; i >= 0; i--) {
-                            const hourDate = new Date(now.getTime() - (i * 60 * 60 * 1000));
-                            hourDate.setMinutes(0, 0, 0);
+                        // Generate last 24 hours of labels and data (96 intervals of 15 minutes)
+                        for (let i = 95; i >= 0; i--) {
+                            const intervalDate = new Date(now.getTime() - (i * 15 * 60 * 1000));
 
-                            // Format timestamp to match backend format "YYYY-MM-DD HH:00:00"
-                            const year = hourDate.getFullYear();
-                            const month = String(hourDate.getMonth() + 1).padStart(2, '0');
-                            const day = String(hourDate.getDate()).padStart(2, '0');
-                            const hour = String(hourDate.getHours()).padStart(2, '0');
-                            const timestamp = `${year}-${month}-${day} ${hour}:00:00`;
+                            // Round down to nearest 15 minutes
+                            const minutes = Math.floor(intervalDate.getMinutes() / 15) * 15;
+                            intervalDate.setMinutes(minutes, 0, 0);
 
-                            // Label format "HH:00"
-                            hourLabels.push(`${hour}:00`);
+                            // Format timestamp to match backend format "YYYY-MM-DD HH:MM:00"
+                            const year = intervalDate.getFullYear();
+                            const month = String(intervalDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(intervalDate.getDate()).padStart(2, '0');
+                            const hour = String(intervalDate.getHours()).padStart(2, '0');
+                            const minute = String(intervalDate.getMinutes()).padStart(2, '0');
+                            const timestamp = `${year}-${month}-${day} ${hour}:${minute}:00`;
+
+                            // Label format - show hour:minute only for :00 and :30 for readability
+                            if (minute === '00' || minute === '30') {
+                                timeLabels.push(`${hour}:${minute}`);
+                            } else {
+                                timeLabels.push(''); // Empty label for :15 and :45 to reduce clutter
+                            }
 
                             // Get data from map or use 0
                             const data = dataMap.get(timestamp) || { total: 0, blocked: 0, unblocked: 0 };
@@ -504,7 +512,8 @@
                         }
 
                         console.log('⏰ Timeline chart data:', {
-                            labels: hourLabels,
+                            labels: timeLabels.filter(l => l !== '').length, // Count non-empty labels
+                            dataPoints: totalCounts.length,
                             total: totalCounts,
                             blocked: blockedCounts,
                             unblocked: unblockedCounts,
@@ -515,10 +524,10 @@
                         // Update chart with total queries
                         // Future: Can add stacked chart with blocked/unblocked datasets
                         if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.data.datasets[0]) {
-                            appCharts.timeline.data.labels = hourLabels;
+                            appCharts.timeline.data.labels = timeLabels;
                             appCharts.timeline.data.datasets[0].data = totalCounts;
                             appCharts.timeline.update('none');
-                            console.log('⏰ Timeline chart updated successfully with', hourLabels.length, 'data points');
+                            console.log('⏰ Timeline chart updated successfully with', totalCounts.length, 'data points (15-min intervals)');
                         } else {
                             console.log('⏰ Timeline chart not ready:', {
                                 hasChart: !!appCharts.timeline,
@@ -664,25 +673,56 @@
                         appCharts.timeline = new Chart(ctx1.getContext('2d'), {
                             type: 'line',
                             data: {
-                                labels: Array.from({length: 24}, (_, i) => (new Date().getHours() - 23 + i + 24) % 24 + 'h'),
+                                // 96 data points = 24 hours * 4 intervals (every 15 minutes)
+                                // Show labels only for :00 and :30 for readability
+                                labels: Array.from({length: 96}, (_, i) => {
+                                    const mins = (i * 15) % 60;
+                                    return (mins === 0 || mins === 30) ? '' : '';
+                                }),
                                 datasets: [{
                                     label: 'Total Queries',
-                                    data: Array(24).fill(0),
+                                    data: Array(96).fill(0),
                                     borderColor: '#3B82F6',
                                     backgroundColor: 'rgba(59,130,246,0.1)',
                                     fill: true,
-                                    tension: 0.4
+                                    tension: 0.4,
+                                    pointRadius: 1,  // Smaller points for 96 data points
+                                    pointHoverRadius: 3
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: true,
                                 aspectRatio: 3,
-                                plugins: {legend: {position: 'top'}},
-                                scales: {y: {beginAtZero: true}}
+                                plugins: {
+                                    legend: {position: 'top'},
+                                    tooltip: {
+                                        callbacks: {
+                                            title: function(context) {
+                                                // Show actual time in tooltip
+                                                const index = context[0].dataIndex;
+                                                const minsAgo = (95 - index) * 15;
+                                                const date = new Date(Date.now() - minsAgo * 60 * 1000);
+                                                const h = String(date.getHours()).padStart(2, '0');
+                                                const m = String(Math.floor(date.getMinutes() / 15) * 15).padStart(2, '0');
+                                                return `${h}:${m}`;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {beginAtZero: true},
+                                    x: {
+                                        ticks: {
+                                            maxRotation: 0,
+                                            autoSkip: true,
+                                            maxTicksLimit: 12  // Show ~12 labels across 24 hours
+                                        }
+                                    }
+                                }
                             }
                         });
-                        console.log('📈 Timeline chart created successfully:', appCharts.timeline);
+                        console.log('📈 Timeline chart created successfully with 96 data points (15-min intervals):', appCharts.timeline);
                     } else {
                         console.log('📈 Timeline chart NOT created - canvas element missing');
                     }
@@ -734,10 +774,10 @@
                     this.loadQuickStats()
                 }, 1000);
 
-                // Slow polling: Chart updates every 30 seconds
+                // Slow polling: Chart updates every 1 minute
                 this.pollingIntervals.slow = setInterval(() => {
                     this.loadChartsData()
-                }, 30000);
+                }, 60000);
             },
             stopPolling() {
                 if (this.pollingIntervals.fast) clearInterval(this.pollingIntervals.fast);

@@ -9,6 +9,7 @@ pub struct GetTimelineUseCase {
 #[derive(Debug, Clone, Copy)]
 pub enum Granularity {
     Minute,
+    QuarterHour,  // 15 minutes
     Hour,
     Day,
 }
@@ -28,6 +29,7 @@ impl GetTimelineUseCase {
 
         let gran_str = match granularity {
             Granularity::Minute => "minute",
+            Granularity::QuarterHour => "quarter_hour",
             Granularity::Hour => "hour",
             Granularity::Day => "day",
         };
