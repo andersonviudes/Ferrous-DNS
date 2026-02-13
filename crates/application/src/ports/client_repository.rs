@@ -49,4 +49,7 @@ pub trait ClientRepository: Send + Sync {
 
     /// Assign a client to a group
     async fn assign_group(&self, client_id: i64, group_id: i64) -> Result<(), DomainError>;
+
+    /// Delete a client by ID
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
 }

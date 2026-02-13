@@ -114,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
         create_client_subnet: use_cases.create_client_subnet,
         delete_client_subnet: use_cases.delete_client_subnet,
         create_manual_client: use_cases.create_manual_client,
+        delete_client: use_cases.delete_client,
         subnet_matcher: use_cases.subnet_matcher.clone(),
         config: config_arc,
         cache: dns_services.cache.clone(),

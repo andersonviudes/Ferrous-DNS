@@ -2,11 +2,11 @@ use super::Repositories;
 use ferrous_dns_application::services::SubnetMatcherService;
 use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CleanupOldClientsUseCase, CreateClientSubnetUseCase,
-    CreateGroupUseCase, CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteGroupUseCase,
-    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase, GetClientsUseCase,
-    GetConfigUseCase, GetGroupsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
-    ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase, TrackClientUseCase,
-    UpdateConfigUseCase, UpdateGroupUseCase,
+    CreateGroupUseCase, CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase,
+    DeleteGroupUseCase, GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase,
+    GetClientsUseCase, GetConfigUseCase, GetGroupsUseCase, GetQueryStatsUseCase,
+    GetRecentQueriesUseCase, ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase,
+    TrackClientUseCase, UpdateConfigUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::PoolManager;
@@ -37,6 +37,7 @@ pub struct UseCases {
     pub create_client_subnet: Arc<CreateClientSubnetUseCase>,
     pub delete_client_subnet: Arc<DeleteClientSubnetUseCase>,
     pub create_manual_client: Arc<CreateManualClientUseCase>,
+    pub delete_client: Arc<DeleteClientUseCase>,
     pub subnet_matcher: Arc<SubnetMatcherService>,
 }
 
@@ -90,6 +91,7 @@ impl UseCases {
                 repos.client.clone(),
                 repos.group.clone(),
             )),
+            delete_client: Arc::new(DeleteClientUseCase::new(repos.client.clone())),
             subnet_matcher,
         }
     }

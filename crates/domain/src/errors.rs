@@ -52,4 +52,7 @@ pub enum DomainError {
 
     #[error("Subnet conflicts with existing: {0}")]
     SubnetConflict(String),
+
+    #[error("Client not found: {0}")]
+    ClientNotFound(String),
 }

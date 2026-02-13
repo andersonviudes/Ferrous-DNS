@@ -1,9 +1,9 @@
 use ferrous_dns_application::services::SubnetMatcherService;
 use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CreateClientSubnetUseCase, CreateGroupUseCase,
-    CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteGroupUseCase,
-    GetBlocklistUseCase, GetClientSubnetsUseCase, GetClientsUseCase, GetGroupsUseCase,
-    GetQueryStatsUseCase, GetRecentQueriesUseCase, UpdateGroupUseCase,
+    CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase,
+    DeleteGroupUseCase, GetBlocklistUseCase, GetClientSubnetsUseCase, GetClientsUseCase,
+    GetGroupsUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::{cache::DnsCache, HickoryDnsResolver};
@@ -25,6 +25,7 @@ pub struct AppState {
     pub create_client_subnet: Arc<CreateClientSubnetUseCase>,
     pub delete_client_subnet: Arc<DeleteClientSubnetUseCase>,
     pub create_manual_client: Arc<CreateManualClientUseCase>,
+    pub delete_client: Arc<DeleteClientUseCase>,
     pub subnet_matcher: Arc<SubnetMatcherService>,
     pub config: Arc<RwLock<Config>>,
     pub cache: Arc<DnsCache>,

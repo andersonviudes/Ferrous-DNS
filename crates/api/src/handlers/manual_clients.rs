@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, response::Json};
+use axum::{extract::{Path, State}, http::StatusCode, response::Json};
 use ferrous_dns_domain::DomainError;
 use tracing::error;
 
@@ -40,6 +40,22 @@ pub async fn create_manual_client(
         Err(DomainError::GroupNotFound(msg)) => Err((StatusCode::BAD_REQUEST, msg)),
         Err(e) => {
             error!(error = %e, "Failed to create manual client");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    }
+}
+
+pub async fn delete_manual_client(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    match state.delete_client.execute(id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(DomainError::NotFound(msg)) | Err(DomainError::ClientNotFound(msg)) => {
+            Err((StatusCode::NOT_FOUND, msg))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to delete client");
             Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
         }
     }

@@ -455,4 +455,22 @@ impl ClientRepository for SqliteClientRepository {
 
         Ok(())
     }
+
+    #[instrument(skip(self))]
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
+        let result = sqlx::query("DELETE FROM clients WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                error!(error = %e, "Failed to delete client");
+                DomainError::DatabaseError(e.to_string())
+            })?;
+
+        if result.rows_affected() == 0 {
+            return Err(DomainError::NotFound(format!("Client {} not found", id)));
+        }
+
+        Ok(())
+    }
 }

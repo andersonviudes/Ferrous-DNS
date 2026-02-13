@@ -19,7 +19,7 @@ pub use clients::{get_client_stats, get_clients};
 pub use config::{get_config, get_settings, reload_config, update_config, update_settings};
 pub use health::health_check;
 pub use hostname::get_hostname;
-pub use manual_clients::create_manual_client;
+pub use manual_clients::{create_manual_client, delete_manual_client};
 pub use queries::get_queries;
 pub use stats::get_stats;
 pub mod upstream;

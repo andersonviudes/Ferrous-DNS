@@ -1,7 +1,7 @@
 use crate::handlers;
 use crate::state::AppState;
 use axum::{
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Router,
 };
 
@@ -22,6 +22,7 @@ pub fn create_api_routes(state: AppState) -> Router {
         .route("/clients", get(handlers::get_clients))
         .route("/clients", post(handlers::create_manual_client))
         .route("/clients/stats", get(handlers::get_client_stats))
+        .route("/clients/{id}", delete(handlers::delete_manual_client))
         .route("/clients/{id}/group", put(handlers::assign_client_to_group))
         // Groups endpoints
         .merge(handlers::groups::routes())
