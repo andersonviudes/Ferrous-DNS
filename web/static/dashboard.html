@@ -452,9 +452,15 @@
             updateTimeline(queries) {
                 if (!this.chartsReady || !appCharts.timeline) return;
 
+                console.log('⏰ updateTimeline called with', queries.length, 'queries');
+
                 const now = new Date();
                 const currentHour = now.getHours();
                 const hoursData = Array(24).fill(0);
+
+                let successfulParsing = 0;
+                let failedParsing = 0;
+                let tooOld = 0;
 
                 // Count queries per hour
                 queries.forEach(q => {
@@ -475,11 +481,24 @@
                             const arrayIndex = 23 - hoursAgo;
                             if (arrayIndex >= 0 && arrayIndex < 24) {
                                 hoursData[arrayIndex]++;
+                                successfulParsing++;
                             }
+                        } else {
+                            tooOld++;
                         }
                     } catch (e) {
+                        failedParsing++;
                         console.error('Error parsing timestamp:', q.timestamp, e);
                     }
+                });
+
+                console.log('⏰ Timeline stats:', {
+                    totalQueries: queries.length,
+                    successfulParsing,
+                    failedParsing,
+                    tooOld,
+                    hoursData,
+                    totalInChart: hoursData.reduce((a, b) => a + b, 0)
                 });
 
                 // Update chart safely (clone data to avoid Alpine.js Proxy issues)
@@ -487,6 +506,14 @@
                     if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.canvas && appCharts.timeline.data.datasets[0]) {
                         appCharts.timeline.data.datasets[0].data = [...hoursData];
                         appCharts.timeline.update('none');
+                        console.log('⏰ Timeline chart updated successfully');
+                    } else {
+                        console.log('⏰ Timeline chart not ready:', {
+                            hasChart: !!appCharts.timeline,
+                            hasData: appCharts.timeline?.data ? true : false,
+                            hasCanvas: appCharts.timeline?.canvas ? true : false,
+                            hasDatasets: appCharts.timeline?.data?.datasets?.[0] ? true : false
+                        });
                     }
                 } catch (e) {
                     console.error('Error updating timeline chart:', e);
