@@ -380,10 +380,10 @@
                     this.initCharts();
                     this.chartsReady = true;
                     lucide.createIcons();
-                }, 500);
 
-                // Start both polling intervals
-                this.startPolling()
+                    // Start polling only after charts are fully initialized
+                    setTimeout(() => this.startPolling(), 100);
+                }, 500);
             },
             toggleTheme() {
                 this.theme = this.theme === 'light' ? 'dark' : 'light';
@@ -469,7 +469,7 @@
 
                 // Update chart safely
                 try {
-                    if (this.charts.timeline && this.charts.timeline.data && this.charts.timeline.data.datasets[0]) {
+                    if (this.charts.timeline && this.charts.timeline.data && this.charts.timeline.canvas && this.charts.timeline.data.datasets[0]) {
                         this.charts.timeline.data.datasets[0].data = hoursData;
                         this.charts.timeline.update('none');
                     }
@@ -506,8 +506,8 @@
                                 }
                             });
                         }
-                    } else if (this.charts.queryTypes && this.charts.queryTypes.data && Object.keys(this.queryTypes).length > 0) {
-                        // Update existing chart
+                    } else if (this.charts.queryTypes && this.charts.queryTypes.data && this.charts.queryTypes.canvas && Object.keys(this.queryTypes).length > 0) {
+                        // Update existing chart only if canvas is still valid
                         this.charts.queryTypes.data.labels = Object.keys(this.queryTypes);
                         this.charts.queryTypes.data.datasets[0].data = Object.values(this.queryTypes);
                         this.charts.queryTypes.update('none');
@@ -541,8 +541,8 @@
                                 }
                             });
                         }
-                    } else if (this.charts.cacheSource && this.charts.cacheSource.data && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
-                        // Update existing chart
+                    } else if (this.charts.cacheSource && this.charts.cacheSource.data && this.charts.cacheSource.canvas && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
+                        // Update existing chart only if canvas is still valid
                         this.charts.cacheSource.data.datasets[0].data = [this.cacheStats.cache, this.cacheStats.upstream];
                         this.charts.cacheSource.update('none');
                     }
