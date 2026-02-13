@@ -218,12 +218,15 @@
         </div>
         <div class="status-item">
             <div class="status-indicator"></div>
-            <span>Active</span></div>
-        <div class="status-item"><i data-lucide="clock" style="width:14px;height:14px;" :style="'color:' + getRateColor()"></i><span
-                x-text="queryRate.rate || '0 q/s'">0 q/s</span>
+            <span>Active</span>
         </div>
-        <div class="status-item"><i data-lucide="package" style="width:14px;height:14px;color:var(--text-secondary)"></i><span id="queries-min"
-                                                                                               x-text="stats.queries_total||0+' q/total'">0 q/total</span>
+        <div class="status-item">
+            <i data-lucide="clock" style="width:14px;height:14px;" :style="'color:' + getRateColor()"></i>
+            <span x-text="queryRate.rate || '0 q/s'">0 q/s</span>
+        </div>
+        <div class="status-item">
+            <i data-lucide="package" style="width:14px;height:14px;color:var(--text-secondary)"></i>
+            <span id="queries-min" x-text="stats.queries_total||0+' q/total'">0 q/total</span>
         </div>
     </div>
     <nav style="flex:1;padding:16px 0">
