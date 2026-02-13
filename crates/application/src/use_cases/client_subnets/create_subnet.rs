@@ -28,8 +28,7 @@ impl CreateClientSubnetUseCase {
         comment: Option<String>,
     ) -> Result<ClientSubnet, DomainError> {
         // Validate CIDR format
-        ClientSubnet::validate_cidr(&subnet_cidr)
-            .map_err(|e| DomainError::InvalidCidr(e))?;
+        ClientSubnet::validate_cidr(&subnet_cidr).map_err(DomainError::InvalidCidr)?;
 
         // Validate CIDR can be parsed
         let _network: ipnetwork::IpNetwork = subnet_cidr

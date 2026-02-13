@@ -1,4 +1,8 @@
-use axum::{extract::{Path, State}, http::StatusCode, response::Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+};
 use ferrous_dns_domain::DomainError;
 use tracing::error;
 

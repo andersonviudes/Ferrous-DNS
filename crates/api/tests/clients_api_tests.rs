@@ -608,8 +608,7 @@ async fn test_delete_client_invalid_id_format() {
 
     // Could be 400 Bad Request or 404 Not Found depending on routing
     assert!(
-        response.status() == StatusCode::BAD_REQUEST
-            || response.status() == StatusCode::NOT_FOUND
+        response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::NOT_FOUND
     );
 }
 

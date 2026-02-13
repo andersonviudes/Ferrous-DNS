@@ -1,5 +1,4 @@
 use ferrous_dns_domain::ClientSubnet;
-use std::net::IpAddr;
 
 #[test]
 fn test_client_subnet_creation_valid() {
@@ -21,7 +20,10 @@ fn test_client_subnet_creation_with_comment() {
     );
 
     assert_eq!(subnet.group_id, 2);
-    assert_eq!(subnet.comment.as_ref().map(|s| s.as_ref()), Some("Office network"));
+    assert_eq!(
+        subnet.comment.as_ref().map(|s| s.as_ref()),
+        Some("Office network")
+    );
 }
 
 #[test]

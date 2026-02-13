@@ -65,9 +65,9 @@ impl ClientSubnetRepository for SqliteClientSubnetRepository {
 
         let id = result.last_insert_rowid();
 
-        self.get_by_id(id).await?.ok_or_else(|| {
-            DomainError::DatabaseError("Failed to fetch created subnet".to_string())
-        })
+        self.get_by_id(id)
+            .await?
+            .ok_or_else(|| DomainError::DatabaseError("Failed to fetch created subnet".to_string()))
     }
 
     #[instrument(skip(self))]

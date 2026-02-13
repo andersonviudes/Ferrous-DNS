@@ -400,11 +400,17 @@ impl ClientRepository for MockClientRepository {
             client.last_mac_update = Some(chrono::Utc::now().to_rfc3339());
             Ok(())
         } else {
-            Err(DomainError::ClientNotFound(format!("Client with IP {} not found", ip_address)))
+            Err(DomainError::ClientNotFound(format!(
+                "Client with IP {} not found",
+                ip_address
+            )))
         }
     }
 
-    async fn batch_update_mac_addresses(&self, updates: Vec<(IpAddr, String)>) -> Result<u64, DomainError> {
+    async fn batch_update_mac_addresses(
+        &self,
+        updates: Vec<(IpAddr, String)>,
+    ) -> Result<u64, DomainError> {
         let mut count = 0u64;
         for (ip, mac) in updates {
             if self.update_mac_address(ip, mac).await.is_ok() {
@@ -414,7 +420,11 @@ impl ClientRepository for MockClientRepository {
         Ok(count)
     }
 
-    async fn update_hostname(&self, ip_address: IpAddr, hostname: String) -> Result<(), DomainError> {
+    async fn update_hostname(
+        &self,
+        ip_address: IpAddr,
+        hostname: String,
+    ) -> Result<(), DomainError> {
         let mut clients = self.clients.write().await;
 
         if let Some(client) = clients.values_mut().find(|c| c.ip_address == ip_address) {
@@ -422,7 +432,10 @@ impl ClientRepository for MockClientRepository {
             client.last_hostname_update = Some(chrono::Utc::now().to_rfc3339());
             Ok(())
         } else {
-            Err(DomainError::ClientNotFound(format!("Client with IP {} not found", ip_address)))
+            Err(DomainError::ClientNotFound(format!(
+                "Client with IP {} not found",
+                ip_address
+            )))
         }
     }
 
@@ -552,7 +565,10 @@ impl ClientRepository for MockClientRepository {
             client.group_id = Some(group_id);
             Ok(())
         } else {
-            Err(DomainError::ClientNotFound(format!("Client {} not found", client_id)))
+            Err(DomainError::ClientNotFound(format!(
+                "Client {} not found",
+                client_id
+            )))
         }
     }
 
@@ -562,7 +578,10 @@ impl ClientRepository for MockClientRepository {
         if clients.remove(&id).is_some() {
             Ok(())
         } else {
-            Err(DomainError::ClientNotFound(format!("Client {} not found", id)))
+            Err(DomainError::ClientNotFound(format!(
+                "Client {} not found",
+                id
+            )))
         }
     }
 }

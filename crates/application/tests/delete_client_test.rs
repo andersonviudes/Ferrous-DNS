@@ -1,6 +1,5 @@
 use ferrous_dns_application::use_cases::DeleteClientUseCase;
 use ferrous_dns_domain::{Client, DomainError};
-use std::net::IpAddr;
 use std::sync::Arc;
 
 mod helpers;
@@ -33,8 +32,8 @@ fn create_test_client_with_data(
     Client {
         id: Some(id),
         ip_address: ip.parse().unwrap(),
-        mac_address: mac.map(|m| Arc::from(m)),
-        hostname: hostname.map(|h| Arc::from(h)),
+        mac_address: mac.map(Arc::from),
+        hostname: hostname.map(Arc::from),
         first_seen: Some(now.clone()),
         last_seen: Some(now.clone()),
         query_count,
@@ -303,7 +302,7 @@ async fn test_concurrent_delete_same_client() {
     let (result1, result2) = tokio::join!(handle1, handle2);
 
     // Assert - one should succeed, one should fail
-    let results = vec![result1.unwrap(), result2.unwrap()];
+    let results = [result1.unwrap(), result2.unwrap()];
     let successes = results.iter().filter(|r| r.is_ok()).count();
     let failures = results.iter().filter(|r| r.is_err()).count();
 

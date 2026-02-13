@@ -4,11 +4,7 @@ use axum::{
     Router,
 };
 use ferrous_dns_api::{create_api_routes, AppState};
-use ferrous_dns_application::{
-    ports::{ClientRepository, ClientSubnetRepository},
-    services::SubnetMatcherService,
-    use_cases::*,
-};
+use ferrous_dns_application::{services::SubnetMatcherService, use_cases::*};
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::{
     dns::{cache::DnsCache, HickoryDnsResolver},
@@ -50,10 +46,12 @@ async fn create_test_db() -> sqlx::SqlitePool {
     .unwrap();
 
     // Insert test groups
-    sqlx::query("INSERT INTO groups (id, name) VALUES (1, 'Protected'), (2, 'Office'), (3, 'Guest')")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO groups (id, name) VALUES (1, 'Protected'), (2, 'Office'), (3, 'Guest')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
 
     // Create clients table
     sqlx::query(
@@ -129,7 +127,8 @@ async fn create_test_app() -> (Router, sqlx::SqlitePool) {
     };
 
     let pool_manager = Arc::new(
-        PoolManager::new(vec![test_pool], None, event_emitter).expect("Failed to create PoolManager"),
+        PoolManager::new(vec![test_pool], None, event_emitter)
+            .expect("Failed to create PoolManager"),
     );
 
     let state = AppState {
@@ -385,7 +384,12 @@ async fn test_delete_subnet_success() {
         .await
         .unwrap();
 
-    let body = create_response.into_body().collect().await.unwrap().to_bytes();
+    let body = create_response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
     let subnet_id = json["id"].as_i64().unwrap();
 
@@ -393,7 +397,7 @@ async fn test_delete_subnet_success() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/client-subnets/{}", subnet_id))
+                .uri(format!("/client-subnets/{}", subnet_id))
                 .method("DELETE")
                 .body(Body::empty())
                 .unwrap(),

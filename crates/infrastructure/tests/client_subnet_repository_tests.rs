@@ -59,14 +59,23 @@ async fn test_create_subnet_success() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    let result = repo.create("192.168.1.0/24".to_string(), 1, Some("Office network".to_string())).await;
+    let result = repo
+        .create(
+            "192.168.1.0/24".to_string(),
+            1,
+            Some("Office network".to_string()),
+        )
+        .await;
 
     assert!(result.is_ok());
     let created = result.unwrap();
     assert!(created.id.is_some());
     assert_eq!(created.subnet_cidr.to_string(), "192.168.1.0/24");
     assert_eq!(created.group_id, 1);
-    assert_eq!(created.comment.as_ref().map(|s| s.as_ref()), Some("Office network"));
+    assert_eq!(
+        created.comment.as_ref().map(|s| s.as_ref()),
+        Some("Office network")
+    );
     assert!(created.created_at.is_some());
 }
 
@@ -75,7 +84,9 @@ async fn test_create_subnet_duplicate() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    repo.create("192.168.1.0/24".to_string(), 1, None).await.unwrap();
+    repo.create("192.168.1.0/24".to_string(), 1, None)
+        .await
+        .unwrap();
 
     let result = repo.create("192.168.1.0/24".to_string(), 2, None).await;
 
@@ -111,9 +122,15 @@ async fn test_get_all_subnets_multiple() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    repo.create("192.168.1.0/24".to_string(), 1, None).await.unwrap();
-    repo.create("10.0.0.0/8".to_string(), 2, None).await.unwrap();
-    repo.create("172.16.0.0/12".to_string(), 1, None).await.unwrap();
+    repo.create("192.168.1.0/24".to_string(), 1, None)
+        .await
+        .unwrap();
+    repo.create("10.0.0.0/8".to_string(), 2, None)
+        .await
+        .unwrap();
+    repo.create("172.16.0.0/12".to_string(), 1, None)
+        .await
+        .unwrap();
 
     let result = repo.get_all().await;
 
@@ -127,7 +144,10 @@ async fn test_get_by_id_success() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    let created = repo.create("192.168.1.0/24".to_string(), 1, Some("Test".to_string())).await.unwrap();
+    let created = repo
+        .create("192.168.1.0/24".to_string(), 1, Some("Test".to_string()))
+        .await
+        .unwrap();
     let id = created.id.unwrap();
 
     let result = repo.get_by_id(id).await;
@@ -158,7 +178,10 @@ async fn test_delete_subnet_success() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    let created = repo.create("192.168.1.0/24".to_string(), 1, None).await.unwrap();
+    let created = repo
+        .create("192.168.1.0/24".to_string(), 1, None)
+        .await
+        .unwrap();
     let id = created.id.unwrap();
 
     let result = repo.delete(id).await;
@@ -185,7 +208,9 @@ async fn test_exists_true() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool);
 
-    repo.create("192.168.1.0/24".to_string(), 1, None).await.unwrap();
+    repo.create("192.168.1.0/24".to_string(), 1, None)
+        .await
+        .unwrap();
 
     let result = repo.exists("192.168.1.0/24").await;
 
@@ -230,7 +255,9 @@ async fn test_delete_cascades_on_group_deletion() {
     let pool = create_test_db().await;
     let repo = SqliteClientSubnetRepository::new(pool.clone());
 
-    repo.create("192.168.1.0/24".to_string(), 1, None).await.unwrap();
+    repo.create("192.168.1.0/24".to_string(), 1, None)
+        .await
+        .unwrap();
 
     // Delete the group
     sqlx::query("DELETE FROM groups WHERE id = 1")

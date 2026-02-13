@@ -77,9 +77,7 @@ impl UseCases {
                 repos.client.clone(),
                 repos.group.clone(),
             )),
-            get_client_subnets: Arc::new(GetClientSubnetsUseCase::new(
-                repos.client_subnet.clone(),
-            )),
+            get_client_subnets: Arc::new(GetClientSubnetsUseCase::new(repos.client_subnet.clone())),
             create_client_subnet: Arc::new(CreateClientSubnetUseCase::new(
                 repos.client_subnet.clone(),
                 repos.group.clone(),

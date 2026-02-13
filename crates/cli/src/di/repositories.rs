@@ -1,9 +1,7 @@
 use ferrous_dns_infrastructure::repositories::{
-    blocklist_repository::SqliteBlocklistRepository,
-    client_repository::SqliteClientRepository,
+    blocklist_repository::SqliteBlocklistRepository, client_repository::SqliteClientRepository,
     client_subnet_repository::SqliteClientSubnetRepository,
-    config_repository::SqliteConfigRepository,
-    group_repository::SqliteGroupRepository,
+    config_repository::SqliteConfigRepository, group_repository::SqliteGroupRepository,
     query_log_repository::SqliteQueryLogRepository,
 };
 use sqlx::SqlitePool;

@@ -24,8 +24,7 @@ impl SubnetMatcherService {
     #[instrument(skip(self))]
     pub async fn refresh(&self) -> Result<(), DomainError> {
         let subnets = self.subnet_repo.get_all().await?;
-        let new_matcher =
-            SubnetMatcher::new(subnets).map_err(|e| DomainError::InvalidCidr(e))?;
+        let new_matcher = SubnetMatcher::new(subnets).map_err(DomainError::InvalidCidr)?;
 
         *self.matcher.write().await = Some(new_matcher);
         debug!("Subnet matcher refreshed");

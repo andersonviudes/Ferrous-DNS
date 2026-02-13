@@ -51,9 +51,7 @@ impl CreateManualClientUseCase {
         }
 
         if let Some(mac) = mac_address {
-            self.client_repo
-                .update_mac_address(ip_address, mac)
-                .await?;
+            self.client_repo.update_mac_address(ip_address, mac).await?;
         }
 
         // Assign group if specified
