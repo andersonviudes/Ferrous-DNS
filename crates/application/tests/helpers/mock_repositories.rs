@@ -261,6 +261,22 @@ impl QueryLogRepository for MockQueryLogRepository {
             record_type_distribution: Vec::new(),
         })
     }
+
+    async fn get_timeline(
+        &self,
+        _period_hours: u32,
+        _granularity: &str,
+    ) -> Result<Vec<ferrous_dns_application::ports::TimelineBucket>, DomainError> {
+        // Mock implementation - returns empty timeline
+        Ok(Vec::new())
+    }
+
+    async fn count_queries_since(&self, _seconds_ago: i64) -> Result<u64, DomainError> {
+        // Mock implementation - returns total count of logs
+        // In real tests, you can configure this by adding logs with specific timestamps
+        let logs = self.logs.read().await;
+        Ok(logs.len() as u64)
+    }
 }
 
 // ============================================================================
