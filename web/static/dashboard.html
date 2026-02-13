@@ -296,7 +296,7 @@
             <p style="font-size:32px;font-weight:700;color:#10B981" x-text="formatTime(stats.avg_cache_time_ms||0)">0 ms</p>
         </div>
     </div>
-    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">⚡ Cache Performance</h2>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">Cache Performance</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px">
         <div class="card" style="padding:16px">
             <div style="display:flex;align-items:center;gap:12px">
@@ -333,17 +333,17 @@
             </div>
         </div>
     </div>
-    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">📈 Queries over Time</h2>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">Queries over Time</h2>
     <div class="card" style="padding:24px;margin-bottom:24px">
         <canvas id="timelineChart" style="max-height:300px"></canvas>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
         <div class="card" style="padding:24px"><h3
-                style="font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">🔍 Query Types</h3>
+                style="font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">Query Types</h3>
             <canvas id="queryTypesChart" style="max-height:250px"></canvas>
         </div>
         <div class="card" style="padding:24px"><h3
-                style="font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">⚡ Cache vs
+                style="font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text-primary)">Cache vs
             Upstream</h3>
             <canvas id="cacheSourceChart" style="max-height:250px"></canvas>
         </div>
