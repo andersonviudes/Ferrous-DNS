@@ -426,10 +426,7 @@
 
                         this.queryTypes = {};
                         queries.forEach(q => {
-                            // Only count queries with valid record types
-                            if (q.record_type && q.record_type !== 'undefined') {
-                                this.queryTypes[q.record_type] = (this.queryTypes[q.record_type] || 0) + 1;
-                            }
+                            this.queryTypes[q.record_type] = (this.queryTypes[q.record_type] || 0) + 1;
                         });
                         console.log('📊 Query types counted:', this.queryTypes);
                         let cache = 0, upstream = 0;
@@ -500,10 +497,10 @@
                 }
 
                 try {
-                    // Clean up invalid entries
+                    // Filter out invalid string keys like "undefined" or "null"
                     const validTypes = {};
                     Object.entries(this.queryTypes).forEach(([key, value]) => {
-                        if (key && key !== 'undefined' && key !== 'null' && value > 0) {
+                        if (key !== 'undefined' && key !== 'null' && value > 0) {
                             validTypes[key] = value;
                         }
                     });
