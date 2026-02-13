@@ -677,7 +677,8 @@
                                 // Show labels only for :00 and :30 for readability
                                 labels: Array.from({length: 96}, (_, i) => {
                                     const mins = (i * 15) % 60;
-                                    return (mins === 0 || mins === 30) ? '' : '';
+                                    // Show label only for :00 and :30 (empty for :15 and :45)
+                                    return (mins === 0 || mins === 30) ? `${Math.floor(i/4)}:${mins === 0 ? '00' : '30'}` : '';
                                 }),
                                 datasets: [{
                                     label: 'Total Queries',
@@ -715,8 +716,11 @@
                                     x: {
                                         ticks: {
                                             maxRotation: 0,
-                                            autoSkip: true,
-                                            maxTicksLimit: 12  // Show ~12 labels across 24 hours
+                                            autoSkip: false,  // Don't skip labels - we control which ones to show
+                                            maxTicksLimit: 48  // Show up to 48 labels (every 30 minutes for 24h)
+                                        },
+                                        grid: {
+                                            display: true
                                         }
                                     }
                                 }
