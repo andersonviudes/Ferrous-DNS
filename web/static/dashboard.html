@@ -644,10 +644,10 @@
                     this.loadQuickStats()
                 }, 1000);
 
-                // Slow polling: Chart updates every 60 seconds
+                // Slow polling: Chart updates every 30 seconds
                 this.pollingIntervals.slow = setInterval(() => {
                     this.loadChartsData()
-                }, 60000);
+                }, 30000);
             },
             stopPolling() {
                 if (this.pollingIntervals.fast) clearInterval(this.pollingIntervals.fast);
