@@ -376,6 +376,62 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         );
         Ok(stats)
     }
+
+    #[instrument(skip(self))]
+    async fn get_timeline(
+        &self,
+        period_hours: u32,
+        granularity: &str,
+    ) -> Result<Vec<ferrous_dns_application::ports::TimelineBucket>, DomainError> {
+        debug!(
+            period_hours = period_hours,
+            granularity = granularity,
+            "Fetching query timeline"
+        );
+
+        // Build dynamic strftime format based on granularity
+        let time_format = match granularity {
+            "minute" => "%Y-%m-%d %H:%M:00",
+            "hour" => "%Y-%m-%d %H:00:00",
+            "day" => "%Y-%m-%d 00:00:00",
+            _ => "%Y-%m-%d %H:00:00", // default to hour
+        };
+
+        let sql = format!(
+            "SELECT
+                strftime('{}', created_at) as time_bucket,
+                COUNT(*) as total,
+                SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) as blocked,
+                SUM(CASE WHEN blocked = 0 THEN 1 ELSE 0 END) as unblocked
+             FROM query_log
+             WHERE created_at >= datetime('now', '-' || ? || ' hours')
+             GROUP BY time_bucket
+             ORDER BY time_bucket ASC",
+            time_format
+        );
+
+        let rows = sqlx::query(&sql)
+            .bind(period_hours as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| {
+                error!(error = %e, "Failed to fetch timeline");
+                DomainError::InvalidDomainName(format!("Database error: {}", e))
+            })?;
+
+        let timeline: Vec<ferrous_dns_application::ports::TimelineBucket> = rows
+            .into_iter()
+            .map(|row| ferrous_dns_application::ports::TimelineBucket {
+                timestamp: row.get("time_bucket"),
+                total: row.get::<i64, _>("total") as u64,
+                blocked: row.get::<i64, _>("blocked") as u64,
+                unblocked: row.get::<i64, _>("unblocked") as u64,
+            })
+            .collect();
+
+        debug!(buckets = timeline.len(), "Timeline fetched successfully");
+        Ok(timeline)
+    }
 }
 
 static START_TIME: std::sync::OnceLock<SystemTime> = std::sync::OnceLock::new();

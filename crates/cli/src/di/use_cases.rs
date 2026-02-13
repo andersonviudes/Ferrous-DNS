@@ -5,7 +5,7 @@ use ferrous_dns_application::use_cases::{
     CreateGroupUseCase, CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase,
     DeleteGroupUseCase, GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase,
     GetClientsUseCase, GetConfigUseCase, GetGroupsUseCase, GetQueryStatsUseCase,
-    GetRecentQueriesUseCase, ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase,
+    GetRecentQueriesUseCase, GetTimelineUseCase, ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase,
     TrackClientUseCase, UpdateConfigUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 pub struct UseCases {
     pub get_stats: Arc<GetQueryStatsUseCase>,
     pub get_queries: Arc<GetRecentQueriesUseCase>,
+    pub get_timeline: Arc<GetTimelineUseCase>,
     pub get_blocklist: Arc<GetBlocklistUseCase>,
     pub get_cache_stats: Arc<GetCacheStatsUseCase>,
     pub get_config: Arc<GetConfigUseCase>,
@@ -56,6 +57,7 @@ impl UseCases {
         Self {
             get_stats: Arc::new(GetQueryStatsUseCase::new(repos.query_log.clone())),
             get_queries: Arc::new(GetRecentQueriesUseCase::new(repos.query_log.clone())),
+            get_timeline: Arc::new(GetTimelineUseCase::new(repos.query_log.clone())),
             get_blocklist: Arc::new(GetBlocklistUseCase::new(repos.blocklist.clone())),
             get_cache_stats: Arc::new(GetCacheStatsUseCase::new()),
             get_config: Arc::new(GetConfigUseCase::new(repos.config.clone())),

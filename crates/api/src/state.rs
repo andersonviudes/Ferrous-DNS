@@ -3,7 +3,7 @@ use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CreateClientSubnetUseCase, CreateGroupUseCase,
     CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase, DeleteGroupUseCase,
     GetBlocklistUseCase, GetClientSubnetsUseCase, GetClientsUseCase, GetGroupsUseCase,
-    GetQueryStatsUseCase, GetRecentQueriesUseCase, UpdateGroupUseCase,
+    GetQueryStatsUseCase, GetRecentQueriesUseCase, GetTimelineUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::{cache::DnsCache, HickoryDnsResolver};
@@ -14,6 +14,7 @@ use tokio::sync::RwLock;
 pub struct AppState {
     pub get_stats: Arc<GetQueryStatsUseCase>,
     pub get_queries: Arc<GetRecentQueriesUseCase>,
+    pub get_timeline: Arc<GetTimelineUseCase>,
     pub get_blocklist: Arc<GetBlocklistUseCase>,
     pub get_clients: Arc<GetClientsUseCase>,
     pub get_groups: Arc<GetGroupsUseCase>,

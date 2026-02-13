@@ -11,6 +11,7 @@ pub mod local_records;
 pub mod manual_clients;
 pub mod queries;
 pub mod stats;
+pub mod timeline;
 
 pub use blocklist::get_blocklist;
 pub use cache::{get_cache_metrics, get_cache_stats};
@@ -22,4 +23,5 @@ pub use hostname::get_hostname;
 pub use manual_clients::{create_manual_client, delete_manual_client};
 pub use queries::get_queries;
 pub use stats::get_stats;
+pub use timeline::get_timeline;
 pub mod upstream;

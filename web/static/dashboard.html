@@ -407,7 +407,7 @@
             async loadChartsData() {
                 // Only load data that updates charts
                 if (!this.chartsReady) return;
-                await this.loadQueryTypes()
+                await Promise.all([this.loadQueryTypes(), this.loadTimelineData()])
             },
             async loadStats() {
                 try {
@@ -442,92 +442,62 @@
                         });
                         this.cacheStats = {cache, upstream};
 
-                        // Process timeline data (queries per hour for last 24 hours)
-                        this.updateTimeline(queries);
+                        // Timeline data is now loaded separately via loadTimelineData()
                     }
                 } catch (e) {
                     console.error(e)
                 }
             },
-            updateTimeline(queries) {
-                console.log('⏰ updateTimeline called with', queries.length, 'queries', {
-                    chartsReady: this.chartsReady,
-                    hasTimeline: !!appCharts.timeline
-                });
-
+            async loadTimelineData() {
                 if (!this.chartsReady || !appCharts.timeline) {
-                    console.log('⏰ Timeline update SKIPPED - charts not ready or timeline missing');
+                    console.log('⏰ Timeline update SKIPPED - charts not ready');
                     return;
                 }
 
-                const now = new Date();
-                const currentHour = now.getHours();
-                const hoursData = Array(24).fill(0);
-
-                let successfulParsing = 0;
-                let failedParsing = 0;
-                let tooOld = 0;
-
-                // Count queries per hour
-                queries.forEach(q => {
-                    if (!q.timestamp) return;
-                    try {
-                        // Parse timestamp format "YYYY-MM-DD HH:MM:SS"
-                        const [datePart, timePart] = q.timestamp.split(' ');
-                        if (!timePart) return;
-                        const hour = parseInt(timePart.split(':')[0]);
-
-                        // Parse full date to check if within last 24h
-                        const queryDate = new Date(q.timestamp.replace(' ', 'T'));
-                        const hoursDiff = (now - queryDate) / (1000 * 60 * 60);
-
-                        if (hoursDiff >= 0 && hoursDiff < 24) {
-                            // Map to correct position in 24h array
-                            const hoursAgo = Math.floor(hoursDiff);
-                            const arrayIndex = 23 - hoursAgo;
-                            if (arrayIndex >= 0 && arrayIndex < 24) {
-                                hoursData[arrayIndex]++;
-                                successfulParsing++;
-                            }
-                        } else {
-                            tooOld++;
-                        }
-                    } catch (e) {
-                        failedParsing++;
-                        console.error('Error parsing timestamp:', q.timestamp, e);
-                    }
-                });
-
-                console.log('⏰ Timeline stats:', {
-                    totalQueries: queries.length,
-                    successfulParsing,
-                    failedParsing,
-                    tooOld,
-                    hoursData,
-                    totalInChart: hoursData.reduce((a, b) => a + b, 0)
-                });
-
-                // Update chart safely (clone data to avoid Alpine.js Proxy issues)
                 try {
-                    if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.canvas && appCharts.timeline.data.datasets[0]) {
-                        appCharts.timeline.data.datasets[0].data = [...hoursData];
-                        appCharts.timeline.update('none');
-                        console.log('⏰ Timeline chart updated successfully');
-                    } else {
-                        console.log('⏰ Timeline chart not ready:', {
-                            hasChart: !!appCharts.timeline,
-                            hasData: appCharts.timeline?.data ? true : false,
-                            hasCanvas: appCharts.timeline?.canvas ? true : false,
-                            hasDatasets: appCharts.timeline?.data?.datasets?.[0] ? true : false
+                    // Request 24 hours of data grouped by hour from backend
+                    const res = await fetch('/api/queries/timeline?period=24h&granularity=hour');
+                    if (res.ok) {
+                        const timeline = await res.json();
+                        console.log('⏰ Timeline data received:', timeline);
+
+                        // Extract data from buckets - now with blocked/unblocked stats
+                        const totalCounts = timeline.buckets.map(b => b.total);
+                        const blockedCounts = timeline.buckets.map(b => b.blocked);
+                        const unblockedCounts = timeline.buckets.map(b => b.unblocked);
+
+                        const hourLabels = timeline.buckets.map(b => {
+                            const date = new Date(b.timestamp);
+                            return date.getHours() + 'h';
                         });
+
+                        console.log('⏰ Timeline chart data:', {
+                            labels: hourLabels,
+                            total: totalCounts,
+                            blocked: blockedCounts,
+                            unblocked: unblockedCounts,
+                            totalQueries: totalCounts.reduce((a, b) => a + b, 0)
+                        });
+
+                        // Update chart with total queries
+                        // Future: Can add stacked chart with blocked/unblocked datasets
+                        if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.data.datasets[0]) {
+                            appCharts.timeline.data.labels = hourLabels;
+                            appCharts.timeline.data.datasets[0].data = totalCounts;
+                            appCharts.timeline.update('none');
+                            console.log('⏰ Timeline chart updated successfully');
+                        } else {
+                            console.log('⏰ Timeline chart not ready:', {
+                                hasChart: !!appCharts.timeline,
+                                hasData: appCharts.timeline?.data ? true : false,
+                                hasCanvas: appCharts.timeline?.canvas ? true : false,
+                                hasDatasets: appCharts.timeline?.data?.datasets?.[0] ? true : false
+                            });
+                        }
                     }
                 } catch (e) {
-                    console.error('Error updating timeline chart:', e);
+                    console.error('Error loading timeline data:', e);
                 }
-
-                // Update other charts
-                this.updateQueryTypesChart();
-                this.updateCacheSourceChart();
             },
             updateQueryTypesChart() {
                 if (!this.chartsReady) {

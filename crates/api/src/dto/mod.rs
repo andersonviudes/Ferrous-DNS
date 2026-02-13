@@ -8,6 +8,7 @@ pub mod hostname;
 pub mod local_record;
 pub mod query;
 pub mod stats;
+pub mod timeline;
 
 pub use local_record::{CreateLocalRecordRequest, LocalRecordDto};
 
@@ -22,3 +23,4 @@ pub use group::{AssignGroupRequest, CreateGroupRequest, GroupResponse, UpdateGro
 pub use hostname::HostnameResponse;
 pub use query::QueryResponse;
 pub use stats::{StatsResponse, TopType, TypeDistribution};
+pub use timeline::{TimelineBucket, TimelineQuery, TimelineResponse};

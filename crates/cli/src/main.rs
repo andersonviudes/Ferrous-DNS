@@ -103,6 +103,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         get_stats: use_cases.get_stats,
         get_queries: use_cases.get_queries,
+        get_timeline: use_cases.get_timeline,
         get_blocklist: use_cases.get_blocklist,
         get_clients: use_cases.get_clients,
         get_groups: use_cases.get_groups,
