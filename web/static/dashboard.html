@@ -357,6 +357,13 @@
     </div>
 </main>
 <script>
+    // Store charts OUTSIDE Alpine.js to avoid Proxy wrapping issues
+    const appCharts = {
+        timeline: null,
+        queryTypes: null,
+        cacheSource: null
+    };
+
     function app() {
         return {
             theme: 'light',
@@ -364,7 +371,6 @@
             cacheMetrics: {},
             cacheStats: {cache: 0, upstream: 0},
             queryTypes: {},
-            charts: {},
             chartsReady: false,
             pollingIntervals: {fast: null, slow: null},
             async init() {
@@ -444,7 +450,7 @@
                 }
             },
             updateTimeline(queries) {
-                if (!this.chartsReady || !this.charts.timeline) return;
+                if (!this.chartsReady || !appCharts.timeline) return;
 
                 const now = new Date();
                 const currentHour = now.getHours();
@@ -476,11 +482,11 @@
                     }
                 });
 
-                // Update chart safely
+                // Update chart safely (clone data to avoid Alpine.js Proxy issues)
                 try {
-                    if (this.charts.timeline && this.charts.timeline.data && this.charts.timeline.canvas && this.charts.timeline.data.datasets[0]) {
-                        this.charts.timeline.data.datasets[0].data = hoursData;
-                        this.charts.timeline.update('none');
+                    if (appCharts.timeline && appCharts.timeline.data && appCharts.timeline.canvas && appCharts.timeline.data.datasets[0]) {
+                        appCharts.timeline.data.datasets[0].data = [...hoursData];
+                        appCharts.timeline.update('none');
                     }
                 } catch (e) {
                     console.error('Error updating timeline chart:', e);
@@ -506,14 +512,14 @@
                     });
 
                     console.log('📊 Valid query types for chart:', validTypes);
-                    console.log('📊 Chart exists?', !!this.charts.queryTypes);
+                    console.log('📊 Chart exists?', !!appCharts.queryTypes);
 
-                    if (!this.charts.queryTypes && Object.keys(validTypes).length > 0) {
+                    if (!appCharts.queryTypes && Object.keys(validTypes).length > 0) {
                         console.log('📊 Creating new Query Types chart');
                         // Create chart if it doesn't exist yet
                         const ctx2 = document.getElementById('queryTypesChart');
                         if (ctx2) {
-                            this.charts.queryTypes = new Chart(ctx2.getContext('2d'), {
+                            appCharts.queryTypes = new Chart(ctx2.getContext('2d'), {
                                 type: 'doughnut',
                                 data: {
                                     labels: Object.keys(validTypes),
@@ -530,17 +536,17 @@
                                 }
                             });
                         }
-                    } else if (this.charts.queryTypes && this.charts.queryTypes.data && this.charts.queryTypes.canvas && Object.keys(validTypes).length > 0) {
+                    } else if (appCharts.queryTypes && appCharts.queryTypes.data && appCharts.queryTypes.canvas && Object.keys(validTypes).length > 0) {
                         // Update existing chart only if canvas is still valid
                         console.log('📊 Updating existing Query Types chart');
-                        this.charts.queryTypes.data.labels = Object.keys(validTypes);
-                        this.charts.queryTypes.data.datasets[0].data = Object.values(validTypes);
-                        this.charts.queryTypes.update('none');
+                        appCharts.queryTypes.data.labels = Object.keys(validTypes);
+                        appCharts.queryTypes.data.datasets[0].data = Object.values(validTypes);
+                        appCharts.queryTypes.update('none');
                     } else {
                         console.log('📊 Query Types chart update skipped:', {
-                            hasChart: !!this.charts.queryTypes,
-                            hasData: this.charts.queryTypes?.data ? true : false,
-                            hasCanvas: this.charts.queryTypes?.canvas ? true : false,
+                            hasChart: !!appCharts.queryTypes,
+                            hasData: appCharts.queryTypes?.data ? true : false,
+                            hasCanvas: appCharts.queryTypes?.canvas ? true : false,
                             validTypesCount: Object.keys(validTypes).length
                         });
                     }
@@ -552,11 +558,11 @@
                 if (!this.chartsReady) return;
 
                 try {
-                    if (!this.charts.cacheSource && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
+                    if (!appCharts.cacheSource && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
                         // Create chart if it doesn't exist yet
                         const ctx3 = document.getElementById('cacheSourceChart');
                         if (ctx3) {
-                            this.charts.cacheSource = new Chart(ctx3.getContext('2d'), {
+                            appCharts.cacheSource = new Chart(ctx3.getContext('2d'), {
                                 type: 'doughnut',
                                 data: {
                                     labels: ['⚡ Cache', '🌐 Upstream'],
@@ -573,10 +579,10 @@
                                 }
                             });
                         }
-                    } else if (this.charts.cacheSource && this.charts.cacheSource.data && this.charts.cacheSource.canvas && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
+                    } else if (appCharts.cacheSource && appCharts.cacheSource.data && appCharts.cacheSource.canvas && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
                         // Update existing chart only if canvas is still valid
-                        this.charts.cacheSource.data.datasets[0].data = [this.cacheStats.cache, this.cacheStats.upstream];
-                        this.charts.cacheSource.update('none');
+                        appCharts.cacheSource.data.datasets[0].data = [this.cacheStats.cache, this.cacheStats.upstream];
+                        appCharts.cacheSource.update('none');
                     }
                 } catch (e) {
                     console.error('Error updating cache source chart:', e);
@@ -602,22 +608,22 @@
             initCharts() {
                 try {
                     // Destroy existing charts before creating new ones
-                    if (this.charts.timeline) {
-                        this.charts.timeline.destroy();
-                        this.charts.timeline = null;
+                    if (appCharts.timeline) {
+                        appCharts.timeline.destroy();
+                        appCharts.timeline = null;
                     }
-                    if (this.charts.queryTypes) {
-                        this.charts.queryTypes.destroy();
-                        this.charts.queryTypes = null;
+                    if (appCharts.queryTypes) {
+                        appCharts.queryTypes.destroy();
+                        appCharts.queryTypes = null;
                     }
-                    if (this.charts.cacheSource) {
-                        this.charts.cacheSource.destroy();
-                        this.charts.cacheSource = null;
+                    if (appCharts.cacheSource) {
+                        appCharts.cacheSource.destroy();
+                        appCharts.cacheSource = null;
                     }
 
                     const ctx1 = document.getElementById('timelineChart');
                     if (ctx1) {
-                        this.charts.timeline = new Chart(ctx1.getContext('2d'), {
+                        appCharts.timeline = new Chart(ctx1.getContext('2d'), {
                             type: 'line',
                             data: {
                                 labels: Array.from({length: 24}, (_, i) => (new Date().getHours() - 23 + i + 24) % 24 + 'h'),
@@ -641,7 +647,7 @@
                     }
                     const ctx2 = document.getElementById('queryTypesChart');
                     if (ctx2 && Object.keys(this.queryTypes).length > 0) {
-                        this.charts.queryTypes = new Chart(ctx2.getContext('2d'), {
+                        appCharts.queryTypes = new Chart(ctx2.getContext('2d'), {
                             type: 'doughnut',
                             data: {
                                 labels: Object.keys(this.queryTypes),
@@ -660,7 +666,7 @@
                     }
                     const ctx3 = document.getElementById('cacheSourceChart');
                     if (ctx3 && (this.cacheStats.cache > 0 || this.cacheStats.upstream > 0)) {
-                        this.charts.cacheSource = new Chart(ctx3.getContext('2d'), {
+                        appCharts.cacheSource = new Chart(ctx3.getContext('2d'), {
                             type: 'doughnut',
                             data: {
                                 labels: ['⚡ Cache', '🌐 Upstream'],
