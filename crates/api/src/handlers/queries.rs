@@ -3,7 +3,10 @@ use crate::{
     state::AppState,
     utils::{parse_period, validate_period},
 };
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use tracing::{debug, error, instrument};
 
 #[instrument(skip(state), name = "api_get_queries")]
@@ -39,10 +42,7 @@ pub async fn get_queries(
                 })
                 .collect();
 
-            debug!(
-                count = response.len(),
-                "Queries retrieved successfully"
-            );
+            debug!(count = response.len(), "Queries retrieved successfully");
             Json(response)
         }
         Err(e) => {

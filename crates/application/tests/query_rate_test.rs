@@ -13,7 +13,7 @@ async fn test_get_query_rate_empty_repository() {
     let repository_mock = Arc::new(MockQueryLogRepository::new());
 
     let use_case = GetQueryRateUseCase::new(
-        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>,
+        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>
     );
 
     let result = use_case.execute(RateUnit::Second).await;
@@ -49,7 +49,7 @@ async fn test_get_query_rate_with_data() {
     }
 
     let use_case = GetQueryRateUseCase::new(
-        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>,
+        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>
     );
 
     let result = use_case.execute(RateUnit::Second).await;
@@ -85,7 +85,7 @@ async fn test_get_query_rate_formatted_with_k() {
     }
 
     let use_case = GetQueryRateUseCase::new(
-        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>,
+        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>
     );
 
     let result = use_case.execute(RateUnit::Second).await;
@@ -121,7 +121,7 @@ async fn test_get_query_rate_different_units() {
     }
 
     let use_case = GetQueryRateUseCase::new(
-        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>,
+        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>
     );
 
     // Test with Second unit
@@ -144,7 +144,7 @@ async fn test_get_query_rate_different_units() {
 async fn test_rate_unit_conversion() {
     let repository_mock = Arc::new(MockQueryLogRepository::new());
     let use_case = GetQueryRateUseCase::new(
-        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>,
+        repository_mock.clone() as Arc<dyn ferrous_dns_application::ports::QueryLogRepository>
     );
 
     // The mock will return the same count for all units

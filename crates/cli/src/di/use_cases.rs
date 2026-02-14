@@ -4,9 +4,10 @@ use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CleanupOldClientsUseCase, CreateClientSubnetUseCase,
     CreateGroupUseCase, CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase,
     DeleteGroupUseCase, GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase,
-    GetClientsUseCase, GetConfigUseCase, GetGroupsUseCase, GetQueryRateUseCase, GetQueryStatsUseCase,
-    GetRecentQueriesUseCase, GetTimelineUseCase, ReloadConfigUseCase, SyncArpCacheUseCase, SyncHostnamesUseCase,
-    TrackClientUseCase, UpdateConfigUseCase, UpdateGroupUseCase,
+    GetClientsUseCase, GetConfigUseCase, GetGroupsUseCase, GetQueryRateUseCase,
+    GetQueryStatsUseCase, GetRecentQueriesUseCase, GetTimelineUseCase, ReloadConfigUseCase,
+    SyncArpCacheUseCase, SyncHostnamesUseCase, TrackClientUseCase, UpdateConfigUseCase,
+    UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::PoolManager;

@@ -2,7 +2,10 @@ use crate::{
     dto::{TimelineBucket, TimelineQuery, TimelineResponse},
     state::AppState,
 };
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use ferrous_dns_application::use_cases::Granularity;
 use tracing::{debug, error, instrument};
 
@@ -31,10 +34,7 @@ pub async fn get_timeline(
 
     match state.get_timeline.execute(period_hours, granularity).await {
         Ok(buckets) => {
-            debug!(
-                buckets = buckets.len(),
-                "Timeline retrieved successfully"
-            );
+            debug!(buckets = buckets.len(), "Timeline retrieved successfully");
 
             let buckets_dto: Vec<TimelineBucket> = buckets
                 .into_iter()
@@ -67,13 +67,10 @@ pub async fn get_timeline(
 
 /// Helper to parse "24h", "7d", "30d" into hours
 fn parse_period(period: &str) -> Option<u32> {
-    if period.ends_with('h') {
-        period[..period.len() - 1].parse().ok()
-    } else if period.ends_with('d') {
-        period[..period.len() - 1]
-            .parse::<u32>()
-            .ok()
-            .map(|d| d * 24)
+    if let Some(stripped) = period.strip_suffix('h') {
+        stripped.parse().ok()
+    } else if let Some(stripped) = period.strip_suffix('d') {
+        stripped.parse::<u32>().ok().map(|d| d * 24)
     } else {
         None
     }

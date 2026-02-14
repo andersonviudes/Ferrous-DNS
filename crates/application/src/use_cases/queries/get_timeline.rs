@@ -9,7 +9,7 @@ pub struct GetTimelineUseCase {
 #[derive(Debug, Clone, Copy)]
 pub enum Granularity {
     Minute,
-    QuarterHour,  // 15 minutes
+    QuarterHour, // 15 minutes
     Hour,
     Day,
 }

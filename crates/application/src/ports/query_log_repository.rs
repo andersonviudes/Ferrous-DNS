@@ -15,7 +15,8 @@ pub struct TimelineBucket {
 #[async_trait]
 pub trait QueryLogRepository: Send + Sync {
     async fn log_query(&self, query: &QueryLog) -> Result<(), DomainError>;
-    async fn get_recent(&self, limit: u32, period_hours: f32) -> Result<Vec<QueryLog>, DomainError>;
+    async fn get_recent(&self, limit: u32, period_hours: f32)
+        -> Result<Vec<QueryLog>, DomainError>;
     async fn get_stats(&self, period_hours: f32) -> Result<QueryStats, DomainError>;
     async fn get_timeline(
         &self,

@@ -33,9 +33,9 @@ pub fn parse_period(period: &str) -> Option<f32> {
 
     match unit {
         "m" => Some(num / 60.0),       // minutes to hours
-        "h" => Some(num),               // hours
-        "d" => Some(num * 24.0),        // days to hours
-        "w" => Some(num * 24.0 * 7.0),  // weeks to hours
+        "h" => Some(num),              // hours
+        "d" => Some(num * 24.0),       // days to hours
+        "w" => Some(num * 24.0 * 7.0), // weeks to hours
         _ => None,
     }
 }

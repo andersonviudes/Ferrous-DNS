@@ -2,7 +2,10 @@ use crate::{
     dto::{QueryRateResponse, RateQuery},
     state::AppState,
 };
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use ferrous_dns_application::use_cases::RateUnit;
 use tracing::{debug, error, instrument};
 

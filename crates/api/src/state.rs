@@ -2,8 +2,9 @@ use ferrous_dns_application::services::SubnetMatcherService;
 use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CreateClientSubnetUseCase, CreateGroupUseCase,
     CreateManualClientUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase, DeleteGroupUseCase,
-    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase, GetClientsUseCase, GetGroupsUseCase,
-    GetQueryRateUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, GetTimelineUseCase, UpdateGroupUseCase,
+    GetBlocklistUseCase, GetCacheStatsUseCase, GetClientSubnetsUseCase, GetClientsUseCase,
+    GetGroupsUseCase, GetQueryRateUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
+    GetTimelineUseCase, UpdateGroupUseCase,
 };
 use ferrous_dns_domain::Config;
 use ferrous_dns_infrastructure::dns::{cache::DnsCache, HickoryDnsResolver};

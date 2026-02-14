@@ -237,8 +237,16 @@ impl QueryLogRepository for SqliteQueryLogRepository {
     }
 
     #[instrument(skip(self))]
-    async fn get_recent(&self, limit: u32, period_hours: f32) -> Result<Vec<QueryLog>, DomainError> {
-        debug!(limit = limit, period_hours = period_hours, "Fetching recent queries with time filter");
+    async fn get_recent(
+        &self,
+        limit: u32,
+        period_hours: f32,
+    ) -> Result<Vec<QueryLog>, DomainError> {
+        debug!(
+            limit = limit,
+            period_hours = period_hours,
+            "Fetching recent queries with time filter"
+        );
 
         let rows = sqlx::query(
             "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source,
@@ -303,7 +311,10 @@ impl QueryLogRepository for SqliteQueryLogRepository {
 
     #[instrument(skip(self))]
     async fn get_stats(&self, period_hours: f32) -> Result<QueryStats, DomainError> {
-        debug!(period_hours = period_hours, "Fetching query statistics with Phase 4 analytics (optimized single-pass)");
+        debug!(
+            period_hours = period_hours,
+            "Fetching query statistics with Phase 4 analytics (optimized single-pass)"
+        );
 
         let row = sqlx::query(
             "SELECT
@@ -407,8 +418,9 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                 // Round minutes to nearest 15 (00, 15, 30, 45)
                 "strftime('%Y-%m-%d %H:', created_at) || \
                  printf('%02d', (CAST(strftime('%M', created_at) AS INTEGER) / 15) * 15) || \
-                 ':00'".to_string()
-            },
+                 ':00'"
+                    .to_string()
+            }
             "hour" => "strftime('%Y-%m-%d %H:00:00', created_at)".to_string(),
             "day" => "strftime('%Y-%m-%d 00:00:00', created_at)".to_string(),
             _ => "strftime('%Y-%m-%d %H:00:00', created_at)".to_string(), // default to hour
@@ -452,12 +464,15 @@ impl QueryLogRepository for SqliteQueryLogRepository {
 
     #[instrument(skip(self))]
     async fn count_queries_since(&self, seconds_ago: i64) -> Result<u64, DomainError> {
-        debug!(seconds_ago = seconds_ago, "Counting queries since N seconds ago");
+        debug!(
+            seconds_ago = seconds_ago,
+            "Counting queries since N seconds ago"
+        );
 
         let row = sqlx::query(
             "SELECT COUNT(*) as count
              FROM query_log
-             WHERE created_at >= datetime('now', '-' || ? || ' seconds')"
+             WHERE created_at >= datetime('now', '-' || ? || ' seconds')",
         )
         .bind(seconds_ago)
         .fetch_one(&self.pool)

@@ -236,7 +236,11 @@ impl QueryLogRepository for MockQueryLogRepository {
         Ok(())
     }
 
-    async fn get_recent(&self, limit: u32, _period_hours: f32) -> Result<Vec<QueryLog>, DomainError> {
+    async fn get_recent(
+        &self,
+        limit: u32,
+        _period_hours: f32,
+    ) -> Result<Vec<QueryLog>, DomainError> {
         let logs = self.logs.read().await;
         let start = logs.len().saturating_sub(limit as usize);
         Ok(logs[start..].to_vec())
@@ -278,11 +282,20 @@ impl QueryLogRepository for MockQueryLogRepository {
         Ok(logs.len() as u64)
     }
 
-    async fn get_cache_stats(&self, _period_hours: f32) -> Result<ferrous_dns_application::ports::CacheStats, DomainError> {
+    async fn get_cache_stats(
+        &self,
+        _period_hours: f32,
+    ) -> Result<ferrous_dns_application::ports::CacheStats, DomainError> {
         // Mock implementation - returns basic cache stats
         let logs = self.logs.read().await;
-        let total_hits = logs.iter().filter(|l| l.cache_hit && !l.cache_refresh).count() as u64;
-        let total_misses = logs.iter().filter(|l| !l.cache_hit && !l.cache_refresh && !l.blocked).count() as u64;
+        let total_hits = logs
+            .iter()
+            .filter(|l| l.cache_hit && !l.cache_refresh)
+            .count() as u64;
+        let total_misses = logs
+            .iter()
+            .filter(|l| !l.cache_hit && !l.cache_refresh && !l.blocked)
+            .count() as u64;
         let total_refreshes = logs.iter().filter(|l| l.cache_refresh).count() as u64;
         let total_queries = total_hits + total_misses;
 
