@@ -425,7 +425,6 @@
                     const res = await fetch('/api/stats/rate?unit=second');
                     if (res.ok) {
                         this.queryRate = await res.json();
-                        console.log('⚡ Query rate:', this.queryRate);
                     }
                 } catch (e) {
                     console.error('Error loading query rate:', e);
@@ -442,19 +441,11 @@
                     const res = await fetch('/api/queries?period=24h');
                     if (res.ok) {
                         const queries = await res.json();
-                        console.log('📊 Total queries received:', queries.length);
-
-                        // Debug: show first query structure
-                        if (queries.length > 0) {
-                            console.log('📊 First query example:', queries[0]);
-                            console.log('📊 Available fields:', Object.keys(queries[0]));
-                        }
 
                         this.queryTypes = {};
                         queries.forEach(q => {
                             this.queryTypes[q.type] = (this.queryTypes[q.type] || 0) + 1;
                         });
-                        console.log('📊 Query types counted:', this.queryTypes);
                         let cache = 0, upstream = 0;
                         queries.forEach(q => {
                             if (q.blocked) return;
@@ -470,7 +461,6 @@
             },
             async loadTimelineData() {
                 if (!this.chartsReady || !appCharts.timeline) {
-                    console.log('⏰ Timeline update SKIPPED - charts not ready');
                     return;
                 }
 
@@ -479,7 +469,6 @@
                     const res = await fetch('/api/queries/timeline?period=24h&granularity=15min');
                     if (res.ok) {
                         const timeline = await res.json();
-                        console.log('⏰ Timeline data received:', timeline);
 
                         // Generate 24-hour labels for the last 24 hours in 15-min intervals (96 data points)
                         const now = new Date();
@@ -528,16 +517,6 @@
                             unblockedCounts.push(data.unblocked);
                         }
 
-                        console.log('⏰ Timeline chart data:', {
-                            labels: timeLabels.filter(l => l !== '').length, // Count non-empty labels
-                            dataPoints: totalCounts.length,
-                            total: totalCounts,
-                            blocked: blockedCounts,
-                            unblocked: unblockedCounts,
-                            totalQueries: totalCounts.reduce((a, b) => a + b, 0),
-                            bucketsReceived: timeline.buckets.length
-                        });
-
                         // Update chart with blocked and unblocked queries (stacked)
                         if (appCharts.timeline && appCharts.timeline.data &&
                             appCharts.timeline.data.datasets[0] && appCharts.timeline.data.datasets[1]) {
@@ -545,14 +524,6 @@
                             appCharts.timeline.data.datasets[0].data = blockedCounts;    // Red area
                             appCharts.timeline.data.datasets[1].data = unblockedCounts;  // Blue area
                             appCharts.timeline.update('none');
-                            console.log('⏰ Timeline chart updated successfully with', totalCounts.length, 'data points (blocked + unblocked stacked)');
-                        } else {
-                            console.log('⏰ Timeline chart not ready:', {
-                                hasChart: !!appCharts.timeline,
-                                hasData: appCharts.timeline?.data ? true : false,
-                                hasCanvas: appCharts.timeline?.canvas ? true : false,
-                                hasDatasets: appCharts.timeline?.data?.datasets ? appCharts.timeline.data.datasets.length : 0
-                            });
                         }
                     }
                 } catch (e) {
@@ -561,7 +532,6 @@
             },
             updateQueryTypesChart() {
                 if (!this.chartsReady) {
-                    console.log('⏸️ Charts not ready yet');
                     return;
                 }
 
@@ -574,11 +544,7 @@
                         }
                     });
 
-                    console.log('📊 Valid query types for chart:', validTypes);
-                    console.log('📊 Chart exists?', !!appCharts.queryTypes);
-
                     if (!appCharts.queryTypes && Object.keys(validTypes).length > 0) {
-                        console.log('📊 Creating new Query Types chart');
                         // Create chart if it doesn't exist yet
                         const ctx2 = document.getElementById('queryTypesChart');
                         if (ctx2) {
@@ -601,17 +567,9 @@
                         }
                     } else if (appCharts.queryTypes && appCharts.queryTypes.data && appCharts.queryTypes.canvas && Object.keys(validTypes).length > 0) {
                         // Update existing chart only if canvas is still valid
-                        console.log('📊 Updating existing Query Types chart');
                         appCharts.queryTypes.data.labels = Object.keys(validTypes);
                         appCharts.queryTypes.data.datasets[0].data = Object.values(validTypes);
                         appCharts.queryTypes.update('none');
-                    } else {
-                        console.log('📊 Query Types chart update skipped:', {
-                            hasChart: !!appCharts.queryTypes,
-                            hasData: appCharts.queryTypes?.data ? true : false,
-                            hasCanvas: appCharts.queryTypes?.canvas ? true : false,
-                            validTypesCount: Object.keys(validTypes).length
-                        });
                     }
                 } catch (e) {
                     console.error('Error updating query types chart:', e);
@@ -669,7 +627,6 @@
                 }
             },
             initCharts() {
-                console.log('📈 initCharts() called');
                 try {
                     // Destroy existing charts before creating new ones
                     if (appCharts.timeline) {
@@ -686,7 +643,6 @@
                     }
 
                     const ctx1 = document.getElementById('timelineChart');
-                    console.log('📈 Timeline canvas element:', ctx1);
                     if (ctx1) {
                         appCharts.timeline = new Chart(ctx1.getContext('2d'), {
                             type: 'line',
@@ -757,10 +713,8 @@
                                 }
                             }
                         });
-                        console.log('📈 Timeline chart created successfully with 96 data points (15-min intervals):', appCharts.timeline);
-                    } else {
-                        console.log('📈 Timeline chart NOT created - canvas element missing');
                     }
+
                     const ctx2 = document.getElementById('queryTypesChart');
                     if (ctx2 && Object.keys(this.queryTypes).length > 0) {
                         appCharts.queryTypes = new Chart(ctx2.getContext('2d'), {
