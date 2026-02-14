@@ -1,6 +1,7 @@
 use crate::{
     dto::{TimelineBucket, TimelineQuery, TimelineResponse},
     state::AppState,
+    utils::{parse_period, validate_period},
 };
 use axum::{
     extract::{Query, State},
@@ -21,7 +22,9 @@ pub async fn get_timeline(
     );
 
     // Parse period (e.g., "24h" -> 24, "7d" -> 168)
-    let period_hours = parse_period(&params.period).unwrap_or(24);
+    let period_hours = parse_period(&params.period)
+        .map(|h| validate_period(h) as u32)
+        .unwrap_or(24);
 
     // Parse granularity
     let granularity = match params.granularity.as_str() {
@@ -65,13 +68,3 @@ pub async fn get_timeline(
     }
 }
 
-/// Helper to parse "24h", "7d", "30d" into hours
-fn parse_period(period: &str) -> Option<u32> {
-    if let Some(stripped) = period.strip_suffix('h') {
-        stripped.parse().ok()
-    } else if let Some(stripped) = period.strip_suffix('d') {
-        stripped.parse::<u32>().ok().map(|d| d * 24)
-    } else {
-        None
-    }
-}
