@@ -5,7 +5,6 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use tracing::{error, instrument};
 
-// Column order: id, name, url, group_id, comment, enabled, created_at, updated_at
 type BlocklistSourceRow = (i64, String, Option<String>, i64, Option<String>, i64, String, String);
 
 pub struct SqliteBlocklistSourceRepository {

@@ -8,13 +8,11 @@ async fn create_test_db() -> SqlitePool {
         .await
         .unwrap();
 
-    // Enable foreign keys
     sqlx::query("PRAGMA foreign_keys = ON")
         .execute(&pool)
         .await
         .unwrap();
 
-    // Create groups table
     sqlx::query(
         "CREATE TABLE groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,7 +28,6 @@ async fn create_test_db() -> SqlitePool {
     .await
     .unwrap();
 
-    // Create blocklist_sources table
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS blocklist_sources (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +44,6 @@ async fn create_test_db() -> SqlitePool {
     .await
     .unwrap();
 
-    // Insert default Protected group
     sqlx::query(
         "INSERT INTO groups (id, name, enabled, comment, is_default)
          VALUES (1, 'Protected', 1, 'Default group', 1)",
@@ -84,7 +80,6 @@ async fn test_create_and_get_source() {
     assert!(source.created_at.is_some());
     assert!(source.updated_at.is_some());
 
-    // Verify fetch by id
     let fetched = repo.get_by_id(source.id.unwrap()).await.unwrap().unwrap();
     assert_eq!(fetched.name.as_ref(), "AdGuard DNS");
 }
@@ -183,7 +178,6 @@ async fn test_update_enabled_field() {
 
     assert!(!updated.enabled);
 
-    // Verify persisted
     let fetched = repo.get_by_id(id).await.unwrap().unwrap();
     assert!(!fetched.enabled);
 }
@@ -218,7 +212,6 @@ async fn test_update_group_id() {
     let pool = create_test_db().await;
     let repo = SqliteBlocklistSourceRepository::new(pool.clone());
 
-    // Insert a second group
     sqlx::query("INSERT INTO groups (id, name) VALUES (2, 'Office')")
         .execute(&pool)
         .await
@@ -271,7 +264,6 @@ async fn test_update_clear_url() {
         .await
         .unwrap();
 
-    // Clear URL by passing Some(None)
     let updated = repo
         .update(source.id.unwrap(), None, Some(None), None, None, None)
         .await
@@ -317,12 +309,10 @@ async fn test_fk_group_restricts_delete() {
     let pool = create_test_db().await;
     let repo = SqliteBlocklistSourceRepository::new(pool.clone());
 
-    // Create a source in group 1
     repo.create("FK Test List".to_string(), None, 1, None, true)
         .await
         .unwrap();
 
-    // Attempt to delete group 1 (which has sources)
     let result = sqlx::query("DELETE FROM groups WHERE id = 1")
         .execute(&pool)
         .await;

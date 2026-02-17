@@ -9,27 +9,19 @@ use std::sync::Arc;
 mod helpers;
 use helpers::{MockBlocklistSourceRepository, MockGroupRepository};
 
-// ============================================================================
-// GetBlocklistSourcesUseCase
-// ============================================================================
-
 #[tokio::test]
 async fn test_get_all_empty() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let use_case = GetBlocklistSourcesUseCase::new(repo);
 
-    // Act
     let result = use_case.get_all().await;
 
-    // Assert
     assert!(result.is_ok());
     assert_eq!(result.unwrap().len(), 0);
 }
 
 #[tokio::test]
 async fn test_get_all_with_sources() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     repo.create(
         "List A".to_string(),
@@ -52,10 +44,8 @@ async fn test_get_all_with_sources() {
 
     let use_case = GetBlocklistSourcesUseCase::new(repo);
 
-    // Act
     let result = use_case.get_all().await;
 
-    // Assert
     assert!(result.is_ok());
     let sources = result.unwrap();
     assert_eq!(sources.len(), 2);
@@ -63,7 +53,6 @@ async fn test_get_all_with_sources() {
 
 #[tokio::test]
 async fn test_get_by_id_found() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let created = repo
         .create("Test List".to_string(), None, 1, None, true)
@@ -73,10 +62,8 @@ async fn test_get_by_id_found() {
 
     let use_case = GetBlocklistSourcesUseCase::new(repo);
 
-    // Act
     let result = use_case.get_by_id(id).await;
 
-    // Assert
     assert!(result.is_ok());
     let maybe_source = result.unwrap();
     assert!(maybe_source.is_some());
@@ -85,30 +72,21 @@ async fn test_get_by_id_found() {
 
 #[tokio::test]
 async fn test_get_by_id_not_found() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let use_case = GetBlocklistSourcesUseCase::new(repo);
 
-    // Act
     let result = use_case.get_by_id(999).await;
 
-    // Assert
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
 }
 
-// ============================================================================
-// CreateBlocklistSourceUseCase
-// ============================================================================
-
 #[tokio::test]
 async fn test_create_success() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
-    let group_repo = Arc::new(MockGroupRepository::new()); // has Protected group (id=1)
+    let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo.clone(), group_repo);
 
-    // Act
     let result = use_case
         .execute(
             "AdGuard List".to_string(),
@@ -119,7 +97,6 @@ async fn test_create_success() {
         )
         .await;
 
-    // Assert
     assert!(result.is_ok());
     let source = result.unwrap();
     assert!(source.id.is_some());
@@ -131,17 +108,14 @@ async fn test_create_success() {
 
 #[tokio::test]
 async fn test_create_without_url_succeeds() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo, group_repo);
 
-    // Act
     let result = use_case
         .execute("Manual List".to_string(), None, 1, None, true)
         .await;
 
-    // Assert
     assert!(result.is_ok());
     let source = result.unwrap();
     assert!(source.url.is_none());
@@ -149,17 +123,14 @@ async fn test_create_without_url_succeeds() {
 
 #[tokio::test]
 async fn test_create_invalid_name_empty() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo, group_repo);
 
-    // Act
     let result = use_case
         .execute("".to_string(), None, 1, None, true)
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::InvalidBlocklistSource(_) => {}
@@ -169,12 +140,10 @@ async fn test_create_invalid_name_empty() {
 
 #[tokio::test]
 async fn test_create_invalid_url_scheme() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo, group_repo);
 
-    // Act
     let result = use_case
         .execute(
             "Bad URL List".to_string(),
@@ -185,7 +154,6 @@ async fn test_create_invalid_url_scheme() {
         )
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::InvalidBlocklistSource(_) => {}
@@ -195,17 +163,14 @@ async fn test_create_invalid_url_scheme() {
 
 #[tokio::test]
 async fn test_create_group_not_found() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
-    let group_repo = Arc::new(MockGroupRepository::new()); // only has group id=1
+    let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo, group_repo);
 
-    // Act
     let result = use_case
         .execute("Test List".to_string(), None, 999, None, true)
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::GroupNotFound(_) => {}
@@ -215,7 +180,6 @@ async fn test_create_group_not_found() {
 
 #[tokio::test]
 async fn test_create_duplicate_name() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = CreateBlocklistSourceUseCase::new(repo, group_repo);
@@ -225,12 +189,10 @@ async fn test_create_duplicate_name() {
         .await
         .unwrap();
 
-    // Act
     let result = use_case
         .execute("Duplicate".to_string(), None, 1, None, true)
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::InvalidBlocklistSource(_) => {}
@@ -238,13 +200,8 @@ async fn test_create_duplicate_name() {
     }
 }
 
-// ============================================================================
-// UpdateBlocklistSourceUseCase
-// ============================================================================
-
 #[tokio::test]
 async fn test_update_toggle_enabled() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let create_uc = CreateBlocklistSourceUseCase::new(repo.clone(), group_repo.clone());
@@ -256,22 +213,18 @@ async fn test_update_toggle_enabled() {
         .unwrap();
     let id = source.id.unwrap();
 
-    // Act - disable
     let result = update_uc
         .execute(id, None, None, None, None, Some(false))
         .await;
 
-    // Assert
     assert!(result.is_ok());
     assert!(!result.unwrap().enabled);
 }
 
 #[tokio::test]
 async fn test_update_change_group() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
-    // Add a second group
     group_repo
         .create("Office".to_string(), None)
         .await
@@ -286,29 +239,24 @@ async fn test_update_change_group() {
         .unwrap();
     let id = source.id.unwrap();
 
-    // Act - change group to id=2
     let result = update_uc
         .execute(id, None, None, Some(2), None, None)
         .await;
 
-    // Assert
     assert!(result.is_ok());
     assert_eq!(result.unwrap().group_id, 2);
 }
 
 #[tokio::test]
 async fn test_update_source_not_found() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let use_case = UpdateBlocklistSourceUseCase::new(repo, group_repo);
 
-    // Act
     let result = use_case
         .execute(999, None, None, None, None, Some(false))
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::BlocklistSourceNotFound(_) => {}
@@ -318,7 +266,6 @@ async fn test_update_source_not_found() {
 
 #[tokio::test]
 async fn test_update_invalid_group() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let create_uc = CreateBlocklistSourceUseCase::new(repo.clone(), group_repo.clone());
@@ -329,12 +276,10 @@ async fn test_update_invalid_group() {
         .await
         .unwrap();
 
-    // Act - try to move to non-existent group
     let result = update_uc
         .execute(source.id.unwrap(), None, None, Some(999), None, None)
         .await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::GroupNotFound(_) => {}
@@ -344,7 +289,6 @@ async fn test_update_invalid_group() {
 
 #[tokio::test]
 async fn test_update_clear_url() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let create_uc = CreateBlocklistSourceUseCase::new(repo.clone(), group_repo.clone());
@@ -361,23 +305,16 @@ async fn test_update_clear_url() {
         .await
         .unwrap();
 
-    // Act - clear URL by passing Some(None)
     let result = update_uc
         .execute(source.id.unwrap(), None, Some(None), None, None, None)
         .await;
 
-    // Assert
     assert!(result.is_ok());
     assert!(result.unwrap().url.is_none());
 }
 
-// ============================================================================
-// DeleteBlocklistSourceUseCase
-// ============================================================================
-
 #[tokio::test]
 async fn test_delete_success() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let create_uc = CreateBlocklistSourceUseCase::new(repo.clone(), group_repo);
@@ -390,24 +327,19 @@ async fn test_delete_success() {
     let id = source.id.unwrap();
     assert_eq!(repo.count().await, 1);
 
-    // Act
     let result = delete_uc.execute(id).await;
 
-    // Assert
     assert!(result.is_ok());
     assert_eq!(repo.count().await, 0);
 }
 
 #[tokio::test]
 async fn test_delete_not_found() {
-    // Arrange
     let repo = Arc::new(MockBlocklistSourceRepository::new());
     let use_case = DeleteBlocklistSourceUseCase::new(repo);
 
-    // Act
     let result = use_case.execute(999).await;
 
-    // Assert
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::BlocklistSourceNotFound(_) => {}

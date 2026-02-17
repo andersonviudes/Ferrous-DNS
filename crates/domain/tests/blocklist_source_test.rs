@@ -33,10 +33,6 @@ fn test_blocklist_source_no_url_no_comment() {
     assert!(!source.enabled);
 }
 
-// ============================================================================
-// validate_name
-// ============================================================================
-
 #[test]
 fn test_validate_name_valid() {
     assert!(BlocklistSource::validate_name("Valid Name").is_ok());
@@ -63,10 +59,6 @@ fn test_validate_name_exactly_200_chars() {
     let name = "a".repeat(200);
     assert!(BlocklistSource::validate_name(&name).is_ok());
 }
-
-// ============================================================================
-// validate_url
-// ============================================================================
 
 #[test]
 fn test_validate_url_valid_https() {
@@ -109,7 +101,6 @@ fn test_validate_url_too_long() {
 
 #[test]
 fn test_validate_url_exactly_2048_chars() {
-    // "https://x.com/" = 14 chars, fill rest up to 2048
     let prefix = "https://x.com/";
     let path = "a".repeat(2048 - prefix.len());
     let url_str = format!("{}{}", prefix, path);
@@ -117,10 +108,6 @@ fn test_validate_url_exactly_2048_chars() {
     let url = Some(Arc::from(url_str.as_str()));
     assert!(BlocklistSource::validate_url(&url).is_ok());
 }
-
-// ============================================================================
-// validate_comment
-// ============================================================================
 
 #[test]
 fn test_validate_comment_valid() {

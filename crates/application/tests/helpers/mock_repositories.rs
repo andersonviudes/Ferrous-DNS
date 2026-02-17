@@ -645,10 +645,6 @@ impl ClientRepository for MockClientRepository {
     }
 }
 
-// ============================================================================
-// Mock BlocklistSourceRepository
-// ============================================================================
-
 #[derive(Clone)]
 pub struct MockBlocklistSourceRepository {
     sources: Arc<RwLock<Vec<BlocklistSource>>>,
@@ -690,7 +686,6 @@ impl BlocklistSourceRepository for MockBlocklistSourceRepository {
     ) -> Result<BlocklistSource, DomainError> {
         let mut sources = self.sources.write().await;
 
-        // Check for unique name
         if sources.iter().any(|s| s.name.as_ref() == name.as_str()) {
             return Err(DomainError::InvalidBlocklistSource(format!(
                 "Blocklist source '{}' already exists",
@@ -777,10 +772,6 @@ impl BlocklistSourceRepository for MockBlocklistSourceRepository {
     }
 }
 
-// ============================================================================
-// Mock GroupRepository
-// ============================================================================
-
 #[derive(Clone)]
 pub struct MockGroupRepository {
     groups: Arc<RwLock<Vec<Group>>>,
@@ -789,7 +780,6 @@ pub struct MockGroupRepository {
 
 impl MockGroupRepository {
     pub fn new() -> Self {
-        // Pre-populate with the default Protected group (id=1)
         let protected = Group::new(
             Some(1),
             Arc::from("Protected"),
@@ -897,11 +887,7 @@ impl GroupRepository for MockGroupRepository {
     }
 }
 
-// ============================================================================
-// Helper Builders
-// ============================================================================
-
-/// Builder para criar DnsResolution facilmente
+pub struct DnsResolutionBuilder {
 pub struct DnsResolutionBuilder {
     addresses: Vec<IpAddr>,
     cache_hit: bool,

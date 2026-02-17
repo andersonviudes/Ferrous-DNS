@@ -28,7 +28,6 @@ async fn create_test_db() -> sqlx::SqlitePool {
         .await
         .unwrap();
 
-    // Create groups table
     sqlx::query(
         r#"
         CREATE TABLE groups (
@@ -46,7 +45,6 @@ async fn create_test_db() -> sqlx::SqlitePool {
     .await
     .unwrap();
 
-    // Insert test groups
     sqlx::query(
         "INSERT INTO groups (id, name, is_default) VALUES (1, 'Protected', 1), (2, 'Office', 0)",
     )
@@ -54,7 +52,6 @@ async fn create_test_db() -> sqlx::SqlitePool {
     .await
     .unwrap();
 
-    // Create clients table
     sqlx::query(
         r#"
         CREATE TABLE clients (
@@ -77,7 +74,6 @@ async fn create_test_db() -> sqlx::SqlitePool {
     .await
     .unwrap();
 
-    // Create client_subnets table
     sqlx::query(
         r#"
         CREATE TABLE client_subnets (
@@ -95,7 +91,6 @@ async fn create_test_db() -> sqlx::SqlitePool {
     .await
     .unwrap();
 
-    // Create blocklist_sources table
     sqlx::query(
         r#"
         CREATE TABLE blocklist_sources (
@@ -205,10 +200,6 @@ async fn create_test_app() -> (Router, sqlx::SqlitePool) {
     (app, pool)
 }
 
-// ============================================================================
-// GET /blocklist-sources
-// ============================================================================
-
 #[tokio::test]
 async fn test_get_all_sources_empty() {
     let (app, _pool) = create_test_app().await;
@@ -231,10 +222,6 @@ async fn test_get_all_sources_empty() {
     assert!(json.is_array());
     assert_eq!(json.as_array().unwrap().len(), 0);
 }
-
-// ============================================================================
-// POST /blocklist-sources
-// ============================================================================
 
 #[tokio::test]
 async fn test_create_source_success() {
@@ -278,7 +265,6 @@ async fn test_create_source_success() {
 async fn test_create_source_defaults() {
     let (app, _pool) = create_test_app().await;
 
-    // Only name is required; group_id defaults to 1, enabled defaults to true
     let payload = json!({ "name": "Minimal List" });
 
     let response = app
@@ -310,7 +296,6 @@ async fn test_create_source_duplicate_name() {
 
     let payload = json!({ "name": "Duplicate List" });
 
-    // First creation
     app.clone()
         .oneshot(
             Request::builder()
@@ -323,7 +308,6 @@ async fn test_create_source_duplicate_name() {
         .await
         .unwrap();
 
-    // Second creation with same name
     let response = app
         .oneshot(
             Request::builder()
@@ -360,7 +344,6 @@ async fn test_create_source_invalid_url() {
         .await
         .unwrap();
 
-    // URL validation errors use InvalidBlocklistSource, which maps to 409 CONFLICT
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
@@ -387,10 +370,6 @@ async fn test_create_source_invalid_group() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
-
-// ============================================================================
-// GET /blocklist-sources/{id}
-// ============================================================================
 
 #[tokio::test]
 async fn test_get_source_by_id() {
@@ -456,10 +435,6 @@ async fn test_get_source_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-// ============================================================================
-// PUT /blocklist-sources/{id}
-// ============================================================================
-
 #[tokio::test]
 async fn test_update_source_toggle_enabled() {
     let (app, _pool) = create_test_app().await;
@@ -488,7 +463,6 @@ async fn test_update_source_toggle_enabled() {
     let created: Value = serde_json::from_slice(&create_body).unwrap();
     let id = created["id"].as_i64().unwrap();
 
-    // Toggle to disabled
     let update_payload = json!({ "enabled": false });
     let response = app
         .oneshot(
@@ -529,10 +503,6 @@ async fn test_update_source_not_found() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
-
-// ============================================================================
-// DELETE /blocklist-sources/{id}
-// ============================================================================
 
 #[tokio::test]
 async fn test_delete_source_success() {
@@ -593,10 +563,6 @@ async fn test_delete_source_not_found() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
-
-// ============================================================================
-// GET /blocklist-sources - after create
-// ============================================================================
 
 #[tokio::test]
 async fn test_get_all_sources_after_create() {
