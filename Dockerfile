@@ -72,9 +72,6 @@ RUN chmod +x /entrypoint.sh && \
     chown root:root /usr/local/bin/ferrous-dns && \
     chmod 755 /usr/local/bin/ferrous-dns
 
-# Expose ports
-EXPOSE 53/udp 53/tcp 8080/tcp
-
 # Set working directory
 WORKDIR /data
 
