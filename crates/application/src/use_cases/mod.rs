@@ -7,11 +7,18 @@ pub mod config;
 pub mod dns;
 pub mod groups;
 pub mod queries;
+pub mod whitelist;
+pub mod whitelist_sources;
 
 pub use blocklist::GetBlocklistUseCase;
 pub use blocklist_sources::{
     CreateBlocklistSourceUseCase, DeleteBlocklistSourceUseCase, GetBlocklistSourcesUseCase,
     UpdateBlocklistSourceUseCase,
+};
+pub use whitelist::GetWhitelistUseCase;
+pub use whitelist_sources::{
+    CreateWhitelistSourceUseCase, DeleteWhitelistSourceUseCase, GetWhitelistSourcesUseCase,
+    UpdateWhitelistSourceUseCase,
 };
 pub use cache::GetCacheStatsUseCase;
 pub use client_subnets::{

@@ -11,9 +11,13 @@ pub mod errors;
 pub mod group;
 pub mod query_filters;
 pub mod query_log;
+pub mod whitelist;
+pub mod whitelist_source;
 
 pub use blocklist::BlockedDomain;
 pub use blocklist_source::BlocklistSource;
+pub use whitelist::WhitelistedDomain;
+pub use whitelist_source::WhitelistSource;
 pub use client::{Client, ClientStats};
 pub use client_subnet::{ClientSubnet, SubnetMatcher};
 pub use config::{

@@ -11,12 +11,18 @@ pub mod query;
 pub mod rate;
 pub mod stats;
 pub mod timeline;
+pub mod whitelist;
+pub mod whitelist_source;
 
 pub use local_record::{CreateLocalRecordRequest, LocalRecordDto};
 
 pub use blocklist::BlocklistResponse;
 pub use blocklist_source::{
     BlocklistSourceResponse, CreateBlocklistSourceRequest, UpdateBlocklistSourceRequest,
+};
+pub use whitelist::WhitelistResponse;
+pub use whitelist_source::{
+    WhitelistSourceResponse, CreateWhitelistSourceRequest, UpdateWhitelistSourceRequest,
 };
 pub use cache::{CacheMetricsResponse, CacheStatsQuery, CacheStatsResponse};
 pub use client::{ClientResponse, ClientStatsResponse, ClientsQuery};

@@ -14,8 +14,11 @@ pub mod queries;
 pub mod rate;
 pub mod stats;
 pub mod timeline;
+pub mod whitelist;
+pub mod whitelist_sources;
 
 pub use blocklist::get_blocklist;
+pub use whitelist::get_whitelist;
 pub use cache::{get_cache_metrics, get_cache_stats};
 pub use client_groups::assign_client_to_group;
 pub use clients::{get_client_stats, get_clients};
