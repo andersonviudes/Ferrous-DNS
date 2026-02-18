@@ -679,7 +679,10 @@ dependencies = [
 name = "ferrous-dns-jobs"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "chrono",
  "ferrous-dns-application",
+ "ferrous-dns-domain",
  "tokio",
  "tracing",
 ]
