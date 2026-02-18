@@ -946,7 +946,7 @@ impl DnsResolutionBuilder {
 
     pub fn build(self) -> DnsResolution {
         DnsResolution {
-            addresses: self.addresses,
+            addresses: std::sync::Arc::new(self.addresses),
             cache_hit: self.cache_hit,
             dnssec_status: self.dnssec_status,
             cname: self.cname,

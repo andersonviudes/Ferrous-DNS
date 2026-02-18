@@ -195,7 +195,7 @@ impl CacheUpdater {
                 cache.insert(
                     domain,
                     *record_type,
-                    super::cache::CachedData::IpAddresses(Arc::new(resolution.addresses.clone())),
+                    super::cache::CachedData::IpAddresses(Arc::clone(&resolution.addresses)),
                     ttl,
                     dnssec_status.map(|_| super::cache::DnssecStatus::Unknown),
                 );

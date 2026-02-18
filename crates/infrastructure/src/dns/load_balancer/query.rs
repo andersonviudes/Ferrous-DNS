@@ -83,14 +83,17 @@ pub async fn query_server(
     let dns_response = ResponseParser::parse(&transport_response.bytes)?;
 
     // PHASE 5: Emit query event for logging (100-200ns, non-blocking)
+    // Create Arc<str> once for domain — reused cheaply if TCP retry is needed
     let response_time_us = start.elapsed().as_micros() as u64;
+    let domain_arc: Arc<str> = Arc::from(domain);
+    let server_str = protocol
+        .socket_addr()
+        .map(|addr| addr.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
     emitter.emit(QueryEvent {
-        domain: Arc::from(domain),
+        domain: Arc::clone(&domain_arc),
         record_type: *record_type,
-        upstream_server: protocol
-            .socket_addr()
-            .map(|addr| addr.to_string())
-            .unwrap_or_else(|| "unknown".to_string()),
+        upstream_server: server_str,
         response_time_us,
         success: !dns_response.addresses.is_empty() || dns_response.cname.is_some(),
     });
@@ -117,7 +120,7 @@ pub async fn query_server(
             // PHASE 5: Emit event for TCP retry as well
             let tcp_response_time_us = tcp_start.elapsed().as_micros() as u64;
             emitter.emit(QueryEvent {
-                domain: Arc::from(domain),
+                domain: domain_arc,
                 record_type: *record_type,
                 upstream_server: tcp_protocol
                     .socket_addr()

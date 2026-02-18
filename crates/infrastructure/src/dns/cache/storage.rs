@@ -164,10 +164,6 @@ impl DnsCache {
             l1_insert(domain, &record_type, Arc::clone(addresses), ttl);
         }
 
-        if let CachedData::IpAddresses(ref addresses) = data {
-            l1_insert(domain, &record_type, Arc::clone(addresses), ttl);
-        }
-
         debug!(
             domain = %domain,
             record_type = %record_type,

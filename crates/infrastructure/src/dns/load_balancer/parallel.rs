@@ -48,9 +48,10 @@ impl ParallelStrategy {
         let mut abort_handles = Vec::with_capacity(servers.len());
         let mut futs = FuturesUnordered::new();
 
+        let domain_arc: std::sync::Arc<str> = domain.into();
         for &protocol in servers {
             let protocol = protocol.clone();
-            let domain = domain.to_string();
+            let domain = std::sync::Arc::clone(&domain_arc);
             let record_type = *record_type;
             let emitter = emitter.clone();
 

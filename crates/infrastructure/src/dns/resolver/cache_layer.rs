@@ -50,7 +50,8 @@ impl CachedResolver {
 
                 match data {
                     CachedData::IpAddresses(addrs) => DnsResolution {
-                        addresses: (*addrs).clone(),
+                        // Arc::clone = atomic increment only, no Vec allocation
+                        addresses: Arc::clone(&addrs),
                         cache_hit: true,
                         dnssec_status: dnssec_str,
                         cname: None,
@@ -60,7 +61,7 @@ impl CachedResolver {
                         // For CNAME, we'll need to resolve the canonical name
                         // This is a simplification - in production you'd handle this properly
                         DnsResolution {
-                            addresses: vec![],
+                            addresses: Arc::new(vec![]),
                             cache_hit: true,
                             dnssec_status: dnssec_str,
                             cname: None,
@@ -70,7 +71,7 @@ impl CachedResolver {
                     CachedData::NegativeResponse => {
                         // Return empty result for negative cache
                         DnsResolution {
-                            addresses: vec![],
+                            addresses: Arc::new(vec![]),
                             cache_hit: true,
                             dnssec_status: dnssec_str,
                             cname: None,
@@ -94,10 +95,9 @@ impl CachedResolver {
                 Some(DnssecStatus::Insecure),
             );
 
-            self.negative_ttl_tracker.record_and_get_ttl(&query.domain);
         } else {
-            // Positive response
-            let addresses = Arc::new(resolution.addresses.clone());
+            // Positive response — Arc::clone avoids cloning the Vec
+            let addresses = Arc::clone(&resolution.addresses);
             let dnssec_status = resolution
                 .dnssec_status
                 .and_then(|s| s.parse().ok())
@@ -126,10 +126,7 @@ impl DnsResolver for CachedResolver {
         if let Some(cached) = self.check_cache(query) {
             if cached.addresses.is_empty() {
                 // Negative cache hit
-                return Err(DomainError::InvalidDomainName(format!(
-                    "Domain {} not found (cached NXDOMAIN)",
-                    query.domain
-                )));
+                return Err(DomainError::NxDomain);
             }
             return Ok(cached);
         }
