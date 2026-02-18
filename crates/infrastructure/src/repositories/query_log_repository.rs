@@ -544,6 +544,23 @@ impl QueryLogRepository for SqliteQueryLogRepository {
             refresh_rate,
         })
     }
+
+    async fn delete_older_than(&self, days: u32) -> Result<u64, DomainError> {
+        let result = sqlx::query(
+            "DELETE FROM query_log WHERE created_at < datetime('now', '-' || ? || ' days')",
+        )
+        .bind(days as i64)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to delete old query logs");
+            DomainError::DatabaseError(format!("Failed to delete old query logs: {}", e))
+        })?;
+
+        let deleted = result.rows_affected();
+        info!(deleted, days, "Old query logs deleted");
+        Ok(deleted)
+    }
 }
 
 static START_TIME: std::sync::OnceLock<SystemTime> = std::sync::OnceLock::new();

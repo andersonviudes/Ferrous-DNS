@@ -29,6 +29,6 @@ pub use groups::{
     UpdateGroupUseCase,
 };
 pub use queries::{
-    GetQueryRateUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase, GetTimelineUseCase,
-    Granularity, QueryRate, RateUnit,
+    CleanupOldQueryLogsUseCase, GetQueryRateUseCase, GetQueryStatsUseCase,
+    GetRecentQueriesUseCase, GetTimelineUseCase, Granularity, QueryRate, RateUnit,
 };

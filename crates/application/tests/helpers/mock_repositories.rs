@@ -320,6 +320,10 @@ impl QueryLogRepository for MockQueryLogRepository {
             refresh_rate,
         })
     }
+
+    async fn delete_older_than(&self, _days: u32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ============================================================================

@@ -1,4 +1,4 @@
-use crate::{ClientSyncJob, RetentionJob};
+use crate::{ClientSyncJob, QueryLogRetentionJob, RetentionJob};
 use std::sync::Arc;
 use tracing::info;
 
@@ -11,13 +11,15 @@ use tracing::info;
 /// ```rust,ignore
 /// JobRunner::new()
 ///     .with_client_sync(ClientSyncJob::new(sync_arp, sync_hostnames))
-///     .with_retention(RetentionJob::new(cleanup, 30))
+///     .with_retention(RetentionJob::new(cleanup_clients, 30))
+///     .with_query_log_retention(QueryLogRetentionJob::new(cleanup_logs, 30))
 ///     .start()
 ///     .await;
 /// ```
 pub struct JobRunner {
     client_sync: Option<ClientSyncJob>,
     retention: Option<RetentionJob>,
+    query_log_retention: Option<QueryLogRetentionJob>,
 }
 
 impl JobRunner {
@@ -25,6 +27,7 @@ impl JobRunner {
         Self {
             client_sync: None,
             retention: None,
+            query_log_retention: None,
         }
     }
 
@@ -38,6 +41,11 @@ impl JobRunner {
         self
     }
 
+    pub fn with_query_log_retention(mut self, job: QueryLogRetentionJob) -> Self {
+        self.query_log_retention = Some(job);
+        self
+    }
+
     /// Start all registered background jobs.
     pub async fn start(self) {
         info!("Starting background job runner");
@@ -47,6 +55,10 @@ impl JobRunner {
         }
 
         if let Some(job) = self.retention {
+            Arc::new(job).start().await;
+        }
+
+        if let Some(job) = self.query_log_retention {
             Arc::new(job).start().await;
         }
 

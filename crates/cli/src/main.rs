@@ -2,7 +2,7 @@ use clap::Parser;
 use ferrous_dns_api::AppState;
 use ferrous_dns_domain::CliOverrides;
 use ferrous_dns_infrastructure::dns::server::DnsServerHandler;
-use ferrous_dns_jobs::{ClientSyncJob, JobRunner, RetentionJob};
+use ferrous_dns_jobs::{ClientSyncJob, JobRunner, QueryLogRetentionJob, RetentionJob};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -87,6 +87,10 @@ async fn main() -> anyhow::Result<()> {
         .with_retention(RetentionJob::new(
             use_cases.cleanup_clients.clone(),
             30, // 30 days retention
+        ))
+        .with_query_log_retention(QueryLogRetentionJob::new(
+            use_cases.cleanup_query_logs.clone(),
+            config.database.queries_log_stored,
         ))
         .start()
         .await;

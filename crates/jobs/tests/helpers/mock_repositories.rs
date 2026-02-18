@@ -1,8 +1,13 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use ferrous_dns_application::ports::{ArpReader, ArpTable, ClientRepository, HostnameResolver};
-use ferrous_dns_domain::{Client, ClientStats, DomainError};
+use ferrous_dns_application::ports::{
+    ArpReader, ArpTable, CacheStats, ClientRepository, HostnameResolver, QueryLogRepository,
+    TimelineBucket,
+};
+use ferrous_dns_domain::{
+    Client, ClientStats, DomainError, QueryLog, QueryStats, RecordType,
+};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -397,5 +402,135 @@ impl ClientRepository for MockClientRepository {
                 id
             )))
         }
+    }
+}
+
+// ============================================================================
+// Mock QueryLogRepository
+// ============================================================================
+
+pub struct MockQueryLogRepository {
+    logs: Arc<RwLock<Vec<(QueryLog, String)>>>, // (log, created_at rfc3339)
+    delete_count: Arc<AtomicU64>,
+}
+
+impl MockQueryLogRepository {
+    pub fn new() -> Self {
+        Self {
+            logs: Arc::new(RwLock::new(Vec::new())),
+            delete_count: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    pub async fn count(&self) -> usize {
+        self.logs.read().await.len()
+    }
+
+    pub fn delete_count(&self) -> u64 {
+        self.delete_count.load(Ordering::Relaxed)
+    }
+
+    /// Add a log entry with a specific creation timestamp (rfc3339)
+    pub async fn add_log_at(&self, ip: &str, timestamp: &str) {
+        let log = QueryLog {
+            id: None,
+            domain: "test.example.com".into(),
+            record_type: RecordType::A,
+            client_ip: ip.parse().unwrap(),
+            blocked: false,
+            response_time_ms: Some(10),
+            cache_hit: false,
+            cache_refresh: false,
+            dnssec_status: None,
+            upstream_server: None,
+            response_status: None,
+            timestamp: Some(timestamp.to_string()),
+            query_source: Default::default(),
+        };
+        self.logs
+            .write()
+            .await
+            .push((log, timestamp.to_string()));
+    }
+
+    /// Add a recent log (now)
+    pub async fn add_recent_log(&self, ip: &str) {
+        let ts = chrono::Utc::now().to_rfc3339();
+        self.add_log_at(ip, &ts).await;
+    }
+
+    /// Add an old log (days_old days ago)
+    pub async fn add_old_log(&self, ip: &str, days_old: i64) {
+        let ts = (chrono::Utc::now() - chrono::Duration::days(days_old)).to_rfc3339();
+        self.add_log_at(ip, &ts).await;
+    }
+}
+
+#[async_trait]
+impl QueryLogRepository for MockQueryLogRepository {
+    async fn log_query(&self, query: &QueryLog) -> Result<(), DomainError> {
+        let ts = chrono::Utc::now().to_rfc3339();
+        self.logs.write().await.push((query.clone(), ts));
+        Ok(())
+    }
+
+    async fn get_recent(
+        &self,
+        limit: u32,
+        _period_hours: f32,
+    ) -> Result<Vec<QueryLog>, DomainError> {
+        let logs = self.logs.read().await;
+        let start = logs.len().saturating_sub(limit as usize);
+        Ok(logs[start..].iter().map(|(l, _)| l.clone()).collect())
+    }
+
+    async fn get_stats(&self, _period_hours: f32) -> Result<QueryStats, DomainError> {
+        let logs = self.logs.read().await;
+        Ok(QueryStats {
+            queries_total: logs.len() as u64,
+            queries_blocked: logs.iter().filter(|(l, _)| l.blocked).count() as u64,
+            unique_clients: 0,
+            uptime_seconds: 0,
+            cache_hit_rate: 0.0,
+            avg_query_time_ms: 0.0,
+            avg_cache_time_ms: 0.0,
+            avg_upstream_time_ms: 0.0,
+            queries_by_type: HashMap::new(),
+            most_queried_type: None,
+            record_type_distribution: Vec::new(),
+        })
+    }
+
+    async fn get_timeline(
+        &self,
+        _period_hours: u32,
+        _granularity: &str,
+    ) -> Result<Vec<TimelineBucket>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn count_queries_since(&self, _seconds_ago: i64) -> Result<u64, DomainError> {
+        Ok(self.logs.read().await.len() as u64)
+    }
+
+    async fn get_cache_stats(&self, _period_hours: f32) -> Result<CacheStats, DomainError> {
+        Ok(CacheStats {
+            total_hits: 0,
+            total_misses: 0,
+            total_refreshes: 0,
+            hit_rate: 0.0,
+            refresh_rate: 0.0,
+        })
+    }
+
+    async fn delete_older_than(&self, days: u32) -> Result<u64, DomainError> {
+        let cutoff =
+            (chrono::Utc::now() - chrono::Duration::days(days as i64)).to_rfc3339();
+        let mut logs = self.logs.write().await;
+        let before = logs.len();
+        logs.retain(|(_, ts)| ts.as_str() >= cutoff.as_str());
+        let deleted = (before - logs.len()) as u64;
+        self.delete_count.fetch_add(deleted, Ordering::Relaxed);
+        Ok(deleted)
     }
 }
