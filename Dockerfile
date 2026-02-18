@@ -37,7 +37,9 @@ RUN mkdir -p crates/cli/src crates/domain/src crates/application/src \
 COPY crates/ ./crates/
 
 # Build the application (static binary)
-RUN cargo build --release --bin ferrous-dns && \
+# Touch all source files to ensure cargo detects changes vs stub artifacts (timestamp fix)
+RUN find crates -name "*.rs" -exec touch {} + && \
+    cargo build --release --bin ferrous-dns && \
     strip target/release/ferrous-dns
 
 # ============================================================================
