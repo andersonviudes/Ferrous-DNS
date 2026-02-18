@@ -2,6 +2,7 @@ use clap::Parser;
 use ferrous_dns_api::AppState;
 use ferrous_dns_domain::CliOverrides;
 use ferrous_dns_infrastructure::dns::server::DnsServerHandler;
+use ferrous_dns_jobs::{ClientSyncJob, JobRunner, RetentionJob};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -77,20 +78,18 @@ async fn main() -> anyhow::Result<()> {
         dns_services.pool_manager.clone(),
     );
 
-    // Start background jobs for client tracking
-    info!("Starting client tracking background jobs");
-    let client_sync_job = Arc::new(ferrous_dns_infrastructure::jobs::ClientSyncJob::new(
-        use_cases.sync_arp.clone(),
-        use_cases.sync_hostnames.clone(),
-    ));
-    client_sync_job.start().await;
-
-    let retention_job = Arc::new(ferrous_dns_infrastructure::jobs::RetentionJob::new(
-        use_cases.cleanup_clients.clone(),
-        30, // 30 days retention
-    ));
-    retention_job.start().await;
-    info!("Client tracking background jobs started");
+    // Start background jobs
+    JobRunner::new()
+        .with_client_sync(ClientSyncJob::new(
+            use_cases.sync_arp.clone(),
+            use_cases.sync_hostnames.clone(),
+        ))
+        .with_retention(RetentionJob::new(
+            use_cases.cleanup_clients.clone(),
+            30, // 30 days retention
+        ))
+        .start()
+        .await;
 
     // Initialize subnet matcher cache
     info!("Loading subnet matcher cache");

@@ -15,7 +15,7 @@ impl RetentionJob {
         Self {
             cleanup,
             retention_days,
-            interval_secs: 86400, // Once per day
+            interval_secs: 86400,
         }
     }
 

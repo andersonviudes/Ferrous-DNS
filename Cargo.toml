@@ -3,6 +3,7 @@ members = [
     "crates/domain",
     "crates/application",
     "crates/infrastructure",
+    "crates/jobs",
     "crates/api",
     "crates/cli"
 ]
@@ -18,6 +19,7 @@ license = "MIT OR Apache-2.0"
 ferrous-dns-domain = { path = "crates/domain" }
 ferrous-dns-application = { path = "crates/application" }
 ferrous-dns-infrastructure = { path = "crates/infrastructure" }
+ferrous-dns-jobs = { path = "crates/jobs" }
 ferrous-dns-api = { path = "crates/api" }
 
 tokio = { version = "1", features = ["full"] }
