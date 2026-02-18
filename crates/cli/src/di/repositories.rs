@@ -32,18 +32,16 @@ impl Repositories {
         let whitelist = SqliteWhitelistRepository::load(pool.clone()).await?;
 
         // Determine the default group id for the BlockFilterEngine
-        let default_group_id: i64 = sqlx::query(
-            "SELECT id FROM groups WHERE is_default = 1 LIMIT 1",
-        )
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| ferrous_dns_domain::DomainError::DatabaseError(e.to_string()))?
-        .map(|row| row.get::<i64, _>("id"))
-        .unwrap_or(1);
+        let default_group_id: i64 =
+            sqlx::query("SELECT id FROM groups WHERE is_default = 1 LIMIT 1")
+                .fetch_optional(&pool)
+                .await
+                .map_err(|e| ferrous_dns_domain::DomainError::DatabaseError(e.to_string()))?
+                .map(|row| row.get::<i64, _>("id"))
+                .unwrap_or(1);
 
-        let block_filter_engine: Arc<dyn BlockFilterEnginePort> = Arc::new(
-            BlockFilterEngine::new(pool.clone(), default_group_id).await?,
-        );
+        let block_filter_engine: Arc<dyn BlockFilterEnginePort> =
+            Arc::new(BlockFilterEngine::new(pool.clone(), default_group_id).await?);
 
         Ok(Self {
             query_log: Arc::new(SqliteQueryLogRepository::new(pool.clone())),

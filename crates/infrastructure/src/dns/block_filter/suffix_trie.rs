@@ -30,6 +30,7 @@ impl TrieNode {
 ///   Walk: root → "com" → "ads" (wildcard_mask set → match!)
 ///
 /// This struct is built once during compilation and replaced via ArcSwap.
+#[derive(Default)]
 pub struct SuffixTrie {
     root: TrieNode,
 }
@@ -41,6 +42,7 @@ impl SuffixTrie {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.root.children.is_empty()
     }
@@ -54,10 +56,7 @@ impl SuffixTrie {
         let mut node = &mut self.root;
         // Traverse labels in reverse order (com → ads → ...)
         for label in domain.split('.').rev() {
-            node = node
-                .children
-                .entry(CompactString::new(label))
-                .or_insert_with(TrieNode::new);
+            node = node.children.entry(CompactString::new(label)).or_default();
         }
         node.wildcard_mask |= source_mask;
     }
@@ -91,12 +90,6 @@ impl SuffixTrie {
         }
 
         result
-    }
-}
-
-impl Default for SuffixTrie {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

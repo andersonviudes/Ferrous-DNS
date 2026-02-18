@@ -9,12 +9,14 @@ use std::time::{Duration, Instant};
 const TTL: Duration = Duration::from_secs(60);
 const L0_CAPACITY: usize = 256;
 
+type BlockL0Cache = LruCache<(CompactString, i64), (bool, Instant), FxBuildHasher>;
+
 // ---------------------------------------------------------------------------
 // L0 — thread-local LRU (no lock, ~10ns hit)
 // ---------------------------------------------------------------------------
 
 thread_local! {
-    static BLOCK_L0: RefCell<LruCache<(CompactString, i64), (bool, Instant), FxBuildHasher>> =
+    static BLOCK_L0: RefCell<BlockL0Cache> =
         RefCell::new(LruCache::with_hasher(
             NonZeroUsize::new(L0_CAPACITY).unwrap(),
             FxBuildHasher,
@@ -39,8 +41,10 @@ pub fn decision_l0_get(domain: &str, group_id: i64) -> Option<bool> {
 #[inline]
 pub fn decision_l0_set(domain: &str, group_id: i64, blocked: bool) {
     BLOCK_L0.with(|c| {
-        c.borrow_mut()
-            .put((CompactString::new(domain), group_id), (blocked, Instant::now()));
+        c.borrow_mut().put(
+            (CompactString::new(domain), group_id),
+            (blocked, Instant::now()),
+        );
     });
 }
 
@@ -90,8 +94,10 @@ impl BlockDecisionCache {
     /// Store the decision for `(domain, group_id)`.
     #[inline]
     pub fn set(&self, domain: &str, group_id: i64, blocked: bool) {
-        self.inner
-            .insert((CompactString::new(domain), group_id), (blocked, Instant::now()));
+        self.inner.insert(
+            (CompactString::new(domain), group_id),
+            (blocked, Instant::now()),
+        );
     }
 
     /// Evict all cached decisions. Called after the `BlockIndex` is swapped so

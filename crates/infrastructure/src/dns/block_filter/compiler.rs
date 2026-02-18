@@ -102,11 +102,7 @@ async fn fetch_url(url: &str, client: &reqwest::Client) -> Result<String, String
         .map_err(|e| format!("fetch error for {}: {}", url, e))?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "HTTP {} for {}",
-            response.status().as_u16(),
-            url
-        ));
+        return Err(format!("HTTP {} for {}", response.status().as_u16(), url));
     }
 
     response
@@ -138,14 +134,12 @@ pub async fn compile_block_index(
     // ------------------------------------------------------------------
     // 1. Default group
     // ------------------------------------------------------------------
-    let default_group_id: i64 = sqlx::query(
-        "SELECT id FROM groups WHERE is_default = 1 LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| DomainError::DatabaseError(e.to_string()))?
-    .map(|row| row.get::<i64, _>("id"))
-    .unwrap_or(1);
+    let default_group_id: i64 = sqlx::query("SELECT id FROM groups WHERE is_default = 1 LIMIT 1")
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| DomainError::DatabaseError(e.to_string()))?
+        .map(|row| row.get::<i64, _>("id"))
+        .unwrap_or(1);
 
     // ------------------------------------------------------------------
     // 2. Load enabled blocklist sources (max 63, bits 0..=62)
@@ -445,7 +439,7 @@ async fn build_allowlist_index(
                         .group_exact
                         .entry(group_id)
                         .or_insert_with(|| DashSet::with_hasher(FxBuildHasher));
-                    let trie = allowlists.group_wildcard.entry(group_id).or_insert_with(SuffixTrie::new);
+                    let trie = allowlists.group_wildcard.entry(group_id).or_default();
 
                     for entry in parse_list_text(&text) {
                         match entry {

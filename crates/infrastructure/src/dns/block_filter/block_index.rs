@@ -17,7 +17,9 @@ pub const MANUAL_SOURCE_BIT: u64 = 1u64 << 63;
 /// Metadata about a single blocklist source (from `blocklist_sources` table).
 #[derive(Debug, Clone)]
 pub struct SourceMeta {
+    #[allow(dead_code)]
     pub id: i64,
+    #[allow(dead_code)]
     pub name: Arc<str>,
     pub group_id: i64,
     /// Bit position in SourceBitSet (0..62). Assigned at compile time.
@@ -88,6 +90,7 @@ impl Default for AllowlistIndex {
 /// Replaced atomically via `ArcSwap<BlockIndex>` during reload — zero downtime.
 pub struct BlockIndex {
     /// Source metadata (index == bit position in SourceBitSet).
+    #[allow(dead_code)]
     pub sources: Vec<SourceMeta>,
 
     /// group_id → active SourceBitSet mask.
@@ -122,15 +125,12 @@ impl BlockIndex {
     /// group mask if `group_id` is not found.
     #[inline]
     pub fn group_mask(&self, group_id: i64) -> SourceBitSet {
-        self.group_masks
-            .get(&group_id)
-            .copied()
-            .unwrap_or_else(|| {
-                self.group_masks
-                    .get(&self.default_group_id)
-                    .copied()
-                    .unwrap_or(u64::MAX)
-            })
+        self.group_masks.get(&group_id).copied().unwrap_or_else(|| {
+            self.group_masks
+                .get(&self.default_group_id)
+                .copied()
+                .unwrap_or(u64::MAX)
+        })
     }
 
     /// Core lookup: returns true if `domain` is blocked for `group_id`.
@@ -252,8 +252,10 @@ mod tests {
             DashMap::with_hasher(FxBuildHasher);
         exact.insert(CompactString::new("ads.com"), 0b01);
 
-        let mut allowlists = AllowlistIndex::new();
-        allowlists.global_exact.insert(CompactString::new("ads.com"));
+        let allowlists = AllowlistIndex::new();
+        allowlists
+            .global_exact
+            .insert(CompactString::new("ads.com"));
 
         let index = BlockIndex {
             sources: vec![],

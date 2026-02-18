@@ -13,6 +13,7 @@ pub mod resolver;
 pub mod server;
 pub mod transport;
 
+pub use block_filter::BlockFilterEngine;
 pub use cache::{
     CacheKey, CacheMetrics, CachedData, CachedRecord, DnsCache, DnssecStatus, EvictionStrategy,
 };
@@ -26,5 +27,4 @@ pub use load_balancer::{
 };
 pub use prefetch::PrefetchPredictor;
 pub use query_logger::QueryEventLogger;
-pub use block_filter::BlockFilterEngine;
 pub use resolver::HickoryDnsResolver;

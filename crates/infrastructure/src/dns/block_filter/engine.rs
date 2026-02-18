@@ -1,6 +1,8 @@
-use super::compiler::compile_block_index;
-use super::decision_cache::{decision_l0_clear, decision_l0_get, decision_l0_set, BlockDecisionCache};
 use super::block_index::BlockIndex;
+use super::compiler::compile_block_index;
+use super::decision_cache::{
+    decision_l0_clear, decision_l0_get, decision_l0_set, BlockDecisionCache,
+};
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -82,12 +84,11 @@ impl BlockFilterEngine {
     /// Load/reload client→group and subnet→group assignments from the DB.
     async fn load_client_groups_inner(&self) -> Result<(), DomainError> {
         // Explicit IP → group_id
-        let client_rows = sqlx::query(
-            "SELECT ip_address, group_id FROM clients WHERE group_id IS NOT NULL",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DomainError::DatabaseError(e.to_string()))?;
+        let client_rows =
+            sqlx::query("SELECT ip_address, group_id FROM clients WHERE group_id IS NOT NULL")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| DomainError::DatabaseError(e.to_string()))?;
 
         self.client_groups.clear();
         for row in &client_rows {
@@ -127,10 +128,7 @@ impl BlockFilterEngine {
         };
         self.subnet_matcher.store(Arc::new(matcher));
 
-        info!(
-            clients = client_rows.len(),
-            "Client groups loaded"
-        );
+        info!(clients = client_rows.len(), "Client groups loaded");
 
         Ok(())
     }
@@ -177,13 +175,21 @@ impl BlockFilterEnginePort for BlockFilterEngine {
     fn check(&self, domain: &str, group_id: i64) -> FilterDecision {
         // L0: thread-local
         if let Some(blocked) = decision_l0_get(domain, group_id) {
-            return if blocked { FilterDecision::Block } else { FilterDecision::Allow };
+            return if blocked {
+                FilterDecision::Block
+            } else {
+                FilterDecision::Allow
+            };
         }
 
         // L1: shared DashMap
         if let Some(blocked) = self.decision_cache.get(domain, group_id) {
             decision_l0_set(domain, group_id, blocked);
-            return if blocked { FilterDecision::Block } else { FilterDecision::Allow };
+            return if blocked {
+                FilterDecision::Block
+            } else {
+                FilterDecision::Allow
+            };
         }
 
         // L2+: full BlockIndex pipeline
@@ -194,7 +200,11 @@ impl BlockFilterEnginePort for BlockFilterEngine {
         self.decision_cache.set(domain, group_id, blocked);
         decision_l0_set(domain, group_id, blocked);
 
-        if blocked { FilterDecision::Block } else { FilterDecision::Allow }
+        if blocked {
+            FilterDecision::Block
+        } else {
+            FilterDecision::Allow
+        }
     }
 
     /// Recompile the `BlockIndex` from DB + HTTP and atomically swap it.
