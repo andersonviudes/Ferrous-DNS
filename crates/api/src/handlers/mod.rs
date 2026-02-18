@@ -18,7 +18,6 @@ pub mod whitelist;
 pub mod whitelist_sources;
 
 pub use blocklist::get_blocklist;
-pub use whitelist::get_whitelist;
 pub use cache::{get_cache_metrics, get_cache_stats};
 pub use client_groups::assign_client_to_group;
 pub use clients::{get_client_stats, get_clients};
@@ -30,4 +29,5 @@ pub use queries::get_queries;
 pub use rate::get_query_rate;
 pub use stats::get_stats;
 pub use timeline::get_timeline;
+pub use whitelist::get_whitelist;
 pub mod upstream;

@@ -14,7 +14,10 @@ fn test_whitelist_source_creation() {
 
     assert_eq!(source.id, Some(1));
     assert_eq!(source.name.as_ref(), "Test Allowlist");
-    assert_eq!(source.url.as_deref(), Some("https://example.com/allowlist.txt"));
+    assert_eq!(
+        source.url.as_deref(),
+        Some("https://example.com/allowlist.txt")
+    );
     assert_eq!(source.group_id, 1);
     assert_eq!(source.comment.as_deref(), Some("Test comment"));
     assert!(source.enabled);

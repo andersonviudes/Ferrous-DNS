@@ -16,8 +16,6 @@ pub mod whitelist_source;
 
 pub use blocklist::BlockedDomain;
 pub use blocklist_source::BlocklistSource;
-pub use whitelist::WhitelistedDomain;
-pub use whitelist_source::WhitelistSource;
 pub use client::{Client, ClientStats};
 pub use client_subnet::{ClientSubnet, SubnetMatcher};
 pub use config::{
@@ -32,3 +30,5 @@ pub use errors::DomainError;
 pub use group::{Group, GroupStats};
 pub use query_filters::{FqdnFilter, PrivateIpFilter};
 pub use query_log::{CacheStats, QueryLog, QuerySource, QueryStats};
+pub use whitelist::WhitelistedDomain;
+pub use whitelist_source::WhitelistSource;

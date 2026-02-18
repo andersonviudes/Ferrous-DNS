@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ferrous_dns_application::ports::WhitelistSourceRepository;
-use ferrous_dns_domain::{WhitelistSource, DomainError};
+use ferrous_dns_domain::{DomainError, WhitelistSource};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tracing::{error, instrument};

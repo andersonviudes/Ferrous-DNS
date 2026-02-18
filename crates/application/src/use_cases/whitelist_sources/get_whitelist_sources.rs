@@ -1,4 +1,4 @@
-use ferrous_dns_domain::{WhitelistSource, DomainError};
+use ferrous_dns_domain::{DomainError, WhitelistSource};
 use std::sync::Arc;
 use tracing::instrument;
 

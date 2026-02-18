@@ -15,11 +15,6 @@ pub use blocklist_sources::{
     CreateBlocklistSourceUseCase, DeleteBlocklistSourceUseCase, GetBlocklistSourcesUseCase,
     UpdateBlocklistSourceUseCase,
 };
-pub use whitelist::GetWhitelistUseCase;
-pub use whitelist_sources::{
-    CreateWhitelistSourceUseCase, DeleteWhitelistSourceUseCase, GetWhitelistSourcesUseCase,
-    UpdateWhitelistSourceUseCase,
-};
 pub use cache::GetCacheStatsUseCase;
 pub use client_subnets::{
     CreateClientSubnetUseCase, DeleteClientSubnetUseCase, GetClientSubnetsUseCase,
@@ -37,4 +32,9 @@ pub use groups::{
 pub use queries::{
     CleanupOldQueryLogsUseCase, GetQueryRateUseCase, GetQueryStatsUseCase, GetRecentQueriesUseCase,
     GetTimelineUseCase, Granularity, QueryRate, RateUnit,
+};
+pub use whitelist::GetWhitelistUseCase;
+pub use whitelist_sources::{
+    CreateWhitelistSourceUseCase, DeleteWhitelistSourceUseCase, GetWhitelistSourcesUseCase,
+    UpdateWhitelistSourceUseCase,
 };

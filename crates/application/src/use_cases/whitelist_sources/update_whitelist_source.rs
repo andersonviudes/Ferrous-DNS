@@ -1,8 +1,8 @@
-use ferrous_dns_domain::{WhitelistSource, DomainError};
+use ferrous_dns_domain::{DomainError, WhitelistSource};
 use std::sync::Arc;
 use tracing::{info, instrument};
 
-use crate::ports::{WhitelistSourceRepository, GroupRepository};
+use crate::ports::{GroupRepository, WhitelistSourceRepository};
 
 pub struct UpdateWhitelistSourceUseCase {
     repo: Arc<dyn WhitelistSourceRepository>,

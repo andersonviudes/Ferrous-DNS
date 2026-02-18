@@ -9,7 +9,7 @@ use ferrous_dns_domain::DomainError;
 use tracing::{debug, error};
 
 use crate::{
-    dto::{WhitelistSourceResponse, CreateWhitelistSourceRequest, UpdateWhitelistSourceRequest},
+    dto::{CreateWhitelistSourceRequest, UpdateWhitelistSourceRequest, WhitelistSourceResponse},
     state::AppState,
 };
 

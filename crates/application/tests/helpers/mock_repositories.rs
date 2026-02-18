@@ -7,8 +7,8 @@ use ferrous_dns_application::ports::{
     GroupRepository, QueryLogRepository, WhitelistRepository, WhitelistSourceRepository,
 };
 use ferrous_dns_domain::{
-    blocklist::BlockedDomain, BlocklistSource, WhitelistedDomain, WhitelistSource, Client,
-    ClientStats, DnsQuery, DomainError, Group, QueryLog, QueryStats, RecordType,
+    blocklist::BlockedDomain, BlocklistSource, Client, ClientStats, DnsQuery, DomainError, Group,
+    QueryLog, QueryStats, RecordType, WhitelistSource, WhitelistedDomain,
 };
 use std::collections::HashMap;
 use std::net::IpAddr;

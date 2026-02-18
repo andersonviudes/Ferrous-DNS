@@ -12,8 +12,7 @@ use ferrous_dns_infrastructure::{
         blocklist_source_repository::SqliteBlocklistSourceRepository,
         client_repository::SqliteClientRepository,
         client_subnet_repository::SqliteClientSubnetRepository,
-        group_repository::SqliteGroupRepository,
-        whitelist_repository::SqliteWhitelistRepository,
+        group_repository::SqliteGroupRepository, whitelist_repository::SqliteWhitelistRepository,
         whitelist_source_repository::SqliteWhitelistSourceRepository,
     },
 };

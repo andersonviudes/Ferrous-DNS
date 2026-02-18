@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use ferrous_dns_domain::{WhitelistSource, DomainError};
+use ferrous_dns_domain::{DomainError, WhitelistSource};
 
 #[async_trait]
 pub trait WhitelistSourceRepository: Send + Sync {

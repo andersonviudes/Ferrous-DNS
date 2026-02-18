@@ -1,4 +1,6 @@
-use crate::ports::{BlocklistRepository, ClientRepository, DnsResolver, QueryLogRepository, WhitelistRepository};
+use crate::ports::{
+    BlocklistRepository, ClientRepository, DnsResolver, QueryLogRepository, WhitelistRepository,
+};
 use ferrous_dns_domain::{DnsQuery, DnsRequest, DomainError, QueryLog, QuerySource};
 use std::net::IpAddr;
 use std::sync::Arc;

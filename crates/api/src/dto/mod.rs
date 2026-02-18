@@ -20,10 +20,6 @@ pub use blocklist::BlocklistResponse;
 pub use blocklist_source::{
     BlocklistSourceResponse, CreateBlocklistSourceRequest, UpdateBlocklistSourceRequest,
 };
-pub use whitelist::WhitelistResponse;
-pub use whitelist_source::{
-    WhitelistSourceResponse, CreateWhitelistSourceRequest, UpdateWhitelistSourceRequest,
-};
 pub use cache::{CacheMetricsResponse, CacheStatsQuery, CacheStatsResponse};
 pub use client::{ClientResponse, ClientStatsResponse, ClientsQuery};
 pub use client_subnet::{
@@ -36,3 +32,7 @@ pub use query::{QueryParams, QueryResponse};
 pub use rate::{QueryRateResponse, RateQuery};
 pub use stats::{StatsQuery, StatsResponse, TopType, TypeDistribution};
 pub use timeline::{TimelineBucket, TimelineQuery, TimelineResponse};
+pub use whitelist::WhitelistResponse;
+pub use whitelist_source::{
+    CreateWhitelistSourceRequest, UpdateWhitelistSourceRequest, WhitelistSourceResponse,
+};
