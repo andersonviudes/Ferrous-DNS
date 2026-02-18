@@ -60,6 +60,11 @@ RUN apk add --no-cache \
 # Copy binary from builder
 COPY --from=builder /app/target/release/ferrous-dns /usr/local/bin/ferrous-dns
 
+# Copy default config and migrations to a stable path outside the volume.
+# The entrypoint will bootstrap these into /data/ on first run.
+COPY --chown=ferrous:ferrous ferrous-dns.toml /usr/local/share/ferrous-dns/ferrous-dns.toml
+COPY --chown=ferrous:ferrous migrations/ /usr/local/share/ferrous-dns/migrations/
+
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
 
