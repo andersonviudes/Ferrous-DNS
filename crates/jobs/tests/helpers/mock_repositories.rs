@@ -431,6 +431,7 @@ impl MockQueryLogRepository {
             response_status: None,
             timestamp: Some(timestamp.to_string()),
             query_source: Default::default(),
+            group_id: None,
         };
         self.logs.write().await.push((log, timestamp.to_string()));
     }

@@ -1,3 +1,4 @@
+pub mod block_filter;
 pub mod cache;
 pub mod cache_updater;
 pub mod cache_warming;
@@ -25,4 +26,5 @@ pub use load_balancer::{
 };
 pub use prefetch::PrefetchPredictor;
 pub use query_logger::QueryEventLogger;
+pub use block_filter::BlockFilterEngine;
 pub use resolver::HickoryDnsResolver;

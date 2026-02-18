@@ -2,7 +2,7 @@ use clap::Parser;
 use ferrous_dns_api::AppState;
 use ferrous_dns_domain::CliOverrides;
 use ferrous_dns_infrastructure::dns::server::DnsServerHandler;
-use ferrous_dns_jobs::{ClientSyncJob, JobRunner, QueryLogRetentionJob, RetentionJob};
+use ferrous_dns_jobs::{BlocklistSyncJob, ClientSyncJob, JobRunner, QueryLogRetentionJob, RetentionJob};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -77,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
             use_cases.cleanup_query_logs.clone(),
             config.database.queries_log_stored,
         ))
+        .with_blocklist_sync(BlocklistSyncJob::new(repos.block_filter_engine.clone()))
         .start()
         .await;
 

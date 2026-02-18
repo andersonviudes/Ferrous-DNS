@@ -1182,6 +1182,7 @@ mod tests {
             response_status: None,
             timestamp: None,
             query_source: Default::default(),
+            group_id: None,
         };
 
         log_repo.log_query(&log).await.unwrap();

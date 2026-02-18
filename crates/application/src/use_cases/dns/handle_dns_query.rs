@@ -1,6 +1,6 @@
 use crate::ports::{
-    BlocklistRepository, ClientRepository, DnsResolution, DnsResolver, QueryLogRepository,
-    WhitelistRepository,
+    BlockFilterEnginePort, ClientRepository, DnsResolution, DnsResolver, FilterDecision,
+    QueryLogRepository,
 };
 use ferrous_dns_domain::{DnsQuery, DnsRequest, DomainError, QueryLog, QuerySource};
 use std::sync::Arc;
@@ -8,8 +8,7 @@ use std::time::Instant;
 
 pub struct HandleDnsQueryUseCase {
     resolver: Arc<dyn DnsResolver>,
-    blocklist: Arc<dyn BlocklistRepository>,
-    whitelist: Arc<dyn WhitelistRepository>,
+    block_filter: Arc<dyn BlockFilterEnginePort>,
     query_log: Arc<dyn QueryLogRepository>,
     client_repo: Option<Arc<dyn ClientRepository>>,
 }
@@ -17,14 +16,12 @@ pub struct HandleDnsQueryUseCase {
 impl HandleDnsQueryUseCase {
     pub fn new(
         resolver: Arc<dyn DnsResolver>,
-        blocklist: Arc<dyn BlocklistRepository>,
-        whitelist: Arc<dyn WhitelistRepository>,
+        block_filter: Arc<dyn BlockFilterEnginePort>,
         query_log: Arc<dyn QueryLogRepository>,
     ) -> Self {
         Self {
             resolver,
-            blocklist,
-            whitelist,
+            block_filter,
             query_log,
             client_repo: None,
         }
@@ -48,14 +45,13 @@ impl HandleDnsQueryUseCase {
             });
         }
 
-        let is_whitelisted = self.whitelist.is_whitelisted(&request.domain).await?;
-        let is_blocked = if is_whitelisted {
-            false
-        } else {
-            self.blocklist.is_blocked(&request.domain).await?
-        };
+        // Resolve which group this client belongs to
+        let group_id = self.block_filter.resolve_group(request.client_ip);
 
-        if is_blocked {
+        // Check block filter pipeline (L0 thread-local → L1 shared cache → BlockIndex)
+        let decision = self.block_filter.check(&request.domain, group_id);
+
+        if matches!(decision, FilterDecision::Block) {
             let query_log = QueryLog {
                 id: None,
                 domain: Arc::clone(&request.domain),
@@ -70,6 +66,7 @@ impl HandleDnsQueryUseCase {
                 response_status: Some("BLOCKED"),
                 timestamp: None,
                 query_source: QuerySource::Client,
+                group_id: Some(group_id),
             };
 
             if let Err(e) = self.query_log.log_query(&query_log).await {
@@ -99,6 +96,7 @@ impl HandleDnsQueryUseCase {
                     response_status: Some("NOERROR"),
                     timestamp: None,
                     query_source: QuerySource::Client,
+                    group_id: Some(group_id),
                 };
 
                 if let Err(e) = self.query_log.log_query(&query_log).await {
@@ -129,6 +127,7 @@ impl HandleDnsQueryUseCase {
                     response_status: Some(response_status),
                     timestamp: None,
                     query_source: QuerySource::Client,
+                    group_id: Some(group_id),
                 };
 
                 if let Err(log_err) = self.query_log.log_query(&query_log).await {

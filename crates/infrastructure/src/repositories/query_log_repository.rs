@@ -25,6 +25,7 @@ struct QueryLogEntry {
     upstream_server: Option<Arc<str>>,
     response_status: Option<&'static str>,
     query_source: CompactString,
+    group_id: Option<i64>,
 }
 
 impl QueryLogEntry {
@@ -41,6 +42,7 @@ impl QueryLogEntry {
             upstream_server: q.upstream_server.as_ref().map(|s| Arc::from(s.as_str())),
             response_status: q.response_status,
             query_source: CompactString::from(q.query_source.as_str()),
+            group_id: q.group_id,
         }
     }
 }
@@ -145,8 +147,8 @@ impl SqliteQueryLogRepository {
 
         let insert_sql = "INSERT INTO query_log \
             (domain, record_type, client_ip, blocked, response_time_ms, cache_hit, \
-             cache_refresh, dnssec_status, upstream_server, response_status, query_source) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+             cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         let mut inserted = 0;
         let mut errors = 0;
@@ -164,6 +166,7 @@ impl SqliteQueryLogRepository {
                 .bind(entry.upstream_server.as_ref().map(|s| s.as_ref()))
                 .bind(entry.response_status)
                 .bind(entry.query_source.as_str())
+                .bind(entry.group_id)
                 .execute(&mut *tx)
                 .await;
 
@@ -228,7 +231,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         );
 
         let rows = sqlx::query(
-            "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source,
+            "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id,
                     datetime(created_at) as created_at
              FROM query_log
              WHERE created_at >= datetime('now', '-' || ? || ' hours')
@@ -280,6 +283,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                     response_status,
                     timestamp: Some(row.get("created_at")),
                     query_source,
+                    group_id: row.get("group_id"),
                 })
             })
             .collect();
