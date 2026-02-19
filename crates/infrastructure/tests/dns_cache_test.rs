@@ -24,6 +24,7 @@ fn create_cache(
         adaptive_thresholds: false,
         min_frequency,
         min_lfuk_score,
+        shard_amount: 4,
     })
 }
 

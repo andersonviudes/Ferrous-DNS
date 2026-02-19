@@ -1,9 +1,10 @@
+use super::coarse_clock::coarse_now_secs;
 use super::data::{CachedData, DnssecStatus};
 use ferrous_dns_domain::RecordType;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::RwLock;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 pub struct CachedRecord {
@@ -58,10 +59,9 @@ impl CachedRecord {
         dnssec_status: Option<DnssecStatus>,
     ) -> Self {
         let now = Instant::now();
-        let now_unix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        // coarse_now_secs() reads an AtomicU64 (~3 ns) vs SystemTime::now() (~50 ns).
+        // last_access is only used for eviction scoring so second-level precision is fine.
+        let now_unix = coarse_now_secs();
 
         let access_history = if use_lfuk {
             Some(Box::new(RwLock::new(VecDeque::with_capacity(10))))
@@ -87,10 +87,7 @@ impl CachedRecord {
 
     pub fn permanent(data: CachedData, ttl: u32, record_type: RecordType) -> Self {
         let now = Instant::now();
-        let now_unix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now_unix = coarse_now_secs();
 
         let expires_at = now + Duration::from_secs(365 * 24 * 60 * 60);
 
@@ -118,9 +115,29 @@ impl CachedRecord {
         Instant::now() >= self.expires_at
     }
 
+    /// Like `is_expired` but reuses a pre-computed `now` to avoid a redundant
+    /// `Instant::now()` syscall when the caller already has a fresh timestamp.
+    #[inline(always)]
+    pub fn is_expired_at(&self, now: Instant) -> bool {
+        if self.permanent {
+            return false;
+        }
+        now >= self.expires_at
+    }
+
     #[inline(always)]
     pub fn is_stale_usable(&self) -> bool {
         let now = Instant::now();
+        let age = now.duration_since(self.inserted_at).as_secs();
+        let max_stale_age = (self.ttl as u64) * 2;
+
+        now >= self.expires_at && age < max_stale_age
+    }
+
+    /// Like `is_stale_usable` but reuses a pre-computed `now` to avoid a
+    /// redundant `Instant::now()` syscall when the caller already has one.
+    #[inline(always)]
+    pub fn is_stale_usable_at(&self, now: Instant) -> bool {
         let age = now.duration_since(self.inserted_at).as_secs();
         let max_stale_age = (self.ttl as u64) * 2;
 

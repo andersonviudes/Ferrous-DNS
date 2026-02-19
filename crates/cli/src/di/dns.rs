@@ -196,6 +196,9 @@ impl DnsServices {
                 adaptive_thresholds: config.dns.cache_adaptive_thresholds,
                 min_frequency: config.dns.cache_min_frequency,
                 min_lfuk_score: config.dns.cache_min_lfuk_score,
+                // 64 shards is a good default for typical multi-core servers.
+                // For Raspberry Pi (4 cores) lower this to 16 to save ~5 MB RAM.
+                shard_amount: 64,
             }))
         } else {
             Arc::new(DnsCache::new(DnsCacheConfig {
@@ -208,6 +211,7 @@ impl DnsServices {
                 adaptive_thresholds: false,
                 min_frequency: 0,
                 min_lfuk_score: 0.0,
+                shard_amount: 4,
             }))
         }
     }

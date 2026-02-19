@@ -27,22 +27,32 @@ impl AtomicBloom {
         let num_hashes = self.num_hashes;
 
         if num_hashes == 5 {
+            // Short-circuit evaluation: on a cache miss (the common rejection case)
+            // we can return false after the very first zero bit, saving up to 4
+            // atomic loads (~3 ns each).  The original code evaluated all 5 and
+            // then ANDed — fast for hits but wasteful for misses.
             let idx0 = Self::nth_hash(h1, h2, 0, self.num_bits);
-            let check0 = self.bits[idx0 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx0 % 64));
+            if self.bits[idx0 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx0 % 64)) == 0 {
+                return false;
+            }
 
             let idx1 = Self::nth_hash(h1, h2, 1, self.num_bits);
-            let check1 = self.bits[idx1 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx1 % 64));
+            if self.bits[idx1 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx1 % 64)) == 0 {
+                return false;
+            }
 
             let idx2 = Self::nth_hash(h1, h2, 2, self.num_bits);
-            let check2 = self.bits[idx2 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx2 % 64));
+            if self.bits[idx2 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx2 % 64)) == 0 {
+                return false;
+            }
 
             let idx3 = Self::nth_hash(h1, h2, 3, self.num_bits);
-            let check3 = self.bits[idx3 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx3 % 64));
+            if self.bits[idx3 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx3 % 64)) == 0 {
+                return false;
+            }
 
             let idx4 = Self::nth_hash(h1, h2, 4, self.num_bits);
-            let check4 = self.bits[idx4 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx4 % 64));
-
-            (check0 & check1 & check2 & check3 & check4) != 0
+            self.bits[idx4 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx4 % 64)) != 0
         } else {
             for i in 0..num_hashes {
                 let bit_idx = Self::nth_hash(h1, h2, i as u64, self.num_bits);
