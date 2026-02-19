@@ -11,6 +11,7 @@ async-trait.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 ipnetwork = "0.20"
+lru.workspace = true
 
 [dev-dependencies]
 chrono = "0.4"

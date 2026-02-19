@@ -41,6 +41,7 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 reqwest.workspace = true
+bytes.workspace = true
 chrono = "0.4.43"
 arc-swap.workspace = true
 aho-corasick.workspace = true

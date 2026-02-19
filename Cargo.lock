@@ -664,6 +664,7 @@ dependencies = [
  "chrono",
  "ferrous-dns-domain",
  "ipnetwork",
+ "lru",
  "tokio",
  "tracing",
 ]
@@ -687,6 +688,7 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "base64",
+ "bytes",
  "chrono",
  "compact_str",
  "dashmap",

@@ -112,7 +112,7 @@ impl DnsTransport for TcpTransport {
         );
 
         Ok(TransportResponse {
-            bytes: response_bytes,
+            bytes: bytes::Bytes::from(response_bytes),
             protocol_used: "TCP",
         })
     }

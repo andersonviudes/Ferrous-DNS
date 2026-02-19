@@ -3,15 +3,18 @@ use crate::ports::{
     QueryLogRepository,
 };
 use ferrous_dns_domain::{DnsQuery, DnsRequest, DomainError, QueryLog, QuerySource};
+use lru::LruCache;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::net::IpAddr;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+const LAST_SEEN_CAPACITY: usize = 8_192;
+
 thread_local! {
-    static LAST_SEEN_TRACKER: RefCell<HashMap<IpAddr, Instant>> =
-        RefCell::new(HashMap::new());
+    static LAST_SEEN_TRACKER: RefCell<LruCache<IpAddr, Instant>> =
+        RefCell::new(LruCache::new(NonZeroUsize::new(LAST_SEEN_CAPACITY).unwrap()));
 }
 
 pub struct HandleDnsQueryUseCase {
@@ -53,13 +56,12 @@ impl HandleDnsQueryUseCase {
         if let Some(client_repo) = &self.client_repo {
             let needs_update = LAST_SEEN_TRACKER.with(|t| {
                 let mut tracker = t.borrow_mut();
-                let now = Instant::now();
-                match tracker.get(&request.client_ip) {
-                    Some(&last) if now.duration_since(last) < self.client_tracking_interval => {
+                match tracker.peek(&request.client_ip) {
+                    Some(&last) if start.duration_since(last) < self.client_tracking_interval => {
                         false
                     }
                     _ => {
-                        tracker.insert(request.client_ip, now);
+                        tracker.put(request.client_ip, start);
                         true
                     }
                 }
