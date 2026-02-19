@@ -104,6 +104,23 @@ fn test_validate_domain_invalid_chars() {
     assert!(ManagedDomain::validate_domain("ads@example.com").is_err());
 }
 
+#[test]
+fn test_validate_domain_wildcard_valid() {
+    // "*.suffix" prefix is the only valid wildcard form
+    assert!(ManagedDomain::validate_domain("*.x.com").is_ok());
+    assert!(ManagedDomain::validate_domain("*.example.org").is_ok());
+    assert!(ManagedDomain::validate_domain("*.sub.domain.com").is_ok());
+}
+
+#[test]
+fn test_validate_domain_wildcard_invalid() {
+    // "*" without "." prefix must be rejected
+    assert!(ManagedDomain::validate_domain("*x.com").is_err());
+    assert!(ManagedDomain::validate_domain("x.*.com").is_err());
+    assert!(ManagedDomain::validate_domain("x.com*").is_err());
+    assert!(ManagedDomain::validate_domain("*").is_err());
+}
+
 // ── validate_comment ──────────────────────────────────────────────────────────
 
 #[test]

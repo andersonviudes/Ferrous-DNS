@@ -78,6 +78,7 @@ pub struct BlockIndex {
     pub patterns: Vec<(AhoCorasick, SourceBitSet)>,
     pub allowlists: AllowlistIndex,
     pub managed_denies: HashMap<i64, DashSet<CompactString, FxBuildHasher>>,
+    pub managed_deny_wildcards: HashMap<i64, SuffixTrie>,
 }
 
 impl BlockIndex {
@@ -99,6 +100,12 @@ impl BlockIndex {
 
         if let Some(set) = self.managed_denies.get(&group_id) {
             if set.contains(domain) {
+                return true;
+            }
+        }
+
+        if let Some(trie) = self.managed_deny_wildcards.get(&group_id) {
+            if trie.lookup(domain) != 0 {
                 return true;
             }
         }

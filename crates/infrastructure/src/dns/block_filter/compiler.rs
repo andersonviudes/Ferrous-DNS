@@ -388,12 +388,20 @@ pub async fn compile_block_index(
     } = build_exact_and_wildcard(&manual_domains, &source_entries);
 
     let mut managed_denies: HashMap<i64, DashSet<CompactString, FxBuildHasher>> = HashMap::new();
+    let mut managed_deny_wildcards: HashMap<i64, SuffixTrie> = HashMap::new();
     for entry in &managed_domain_entries {
         if entry.action == "deny" {
-            managed_denies
-                .entry(entry.group_id)
-                .or_insert_with(|| DashSet::with_hasher(FxBuildHasher))
-                .insert(CompactString::new(&entry.domain));
+            if entry.domain.starts_with("*.") {
+                managed_deny_wildcards
+                    .entry(entry.group_id)
+                    .or_insert_with(SuffixTrie::new)
+                    .insert_wildcard(&entry.domain, 1u64);
+            } else {
+                managed_denies
+                    .entry(entry.group_id)
+                    .or_insert_with(|| DashSet::with_hasher(FxBuildHasher))
+                    .insert(CompactString::new(&entry.domain));
+            }
         }
     }
 
@@ -418,6 +426,7 @@ pub async fn compile_block_index(
         patterns,
         allowlists,
         managed_denies,
+        managed_deny_wildcards,
     })
 }
 
@@ -484,11 +493,19 @@ async fn build_allowlist_index(
 
     for entry in managed_entries {
         if entry.action == "allow" {
-            allowlists
-                .group_exact
-                .entry(entry.group_id)
-                .or_insert_with(|| DashSet::with_hasher(FxBuildHasher))
-                .insert(CompactString::new(&entry.domain));
+            if entry.domain.starts_with("*.") {
+                allowlists
+                    .group_wildcard
+                    .entry(entry.group_id)
+                    .or_insert_with(SuffixTrie::new)
+                    .insert_wildcard(&entry.domain, 1u64);
+            } else {
+                allowlists
+                    .group_exact
+                    .entry(entry.group_id)
+                    .or_insert_with(|| DashSet::with_hasher(FxBuildHasher))
+                    .insert(CompactString::new(&entry.domain));
+            }
         }
     }
 

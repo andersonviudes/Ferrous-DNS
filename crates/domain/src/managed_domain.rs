@@ -78,12 +78,27 @@ impl ManagedDomain {
         if domain.len() > 253 {
             return Err("Domain cannot exceed 253 characters".to_string());
         }
-        let valid = domain
+
+        // If domain contains '*', it must be exactly the "*.suffix" prefix form.
+        // Reject "*x.com", "x.*.com", "x.com*", etc.
+        if domain.contains('*') && !domain.starts_with("*.") {
+            return Err(
+                "Wildcard must be a prefix: use '*.example.com' format".to_string(),
+            );
+        }
+
+        let check = if let Some(rest) = domain.strip_prefix("*.") {
+            rest
+        } else {
+            domain
+        };
+
+        let valid = check
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.' || c == '_' || c == '*');
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.' || c == '_');
         if !valid {
             return Err(
-                "Domain contains invalid characters (only alphanumeric, hyphens, dots, underscores and wildcards are allowed)".to_string(),
+                "Domain contains invalid characters (only alphanumeric, hyphens, dots and underscores are allowed)".to_string(),
             );
         }
         Ok(())
