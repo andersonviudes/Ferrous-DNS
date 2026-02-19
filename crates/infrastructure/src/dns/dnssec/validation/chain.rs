@@ -2,8 +2,12 @@ use crate::dns::dnssec::cache::DnssecCache;
 use crate::dns::dnssec::crypto::SignatureVerifier;
 use crate::dns::dnssec::trust_anchor::TrustAnchorStore;
 use crate::dns::dnssec::types::{DnskeyRecord, DsRecord, RrsigRecord};
+use crate::dns::forwarding::record_type_map::RecordTypeMapper;
 use crate::dns::load_balancer::PoolManager;
 use ferrous_dns_domain::{DomainError, RecordType};
+use hickory_proto::dnssec::rdata::DNSSECRData;
+use hickory_proto::dnssec::PublicKey;
+use hickory_proto::rr::{RData, Record};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -28,6 +32,12 @@ impl ValidationResult {
             Self::Indeterminate => "Indeterminate",
         }
     }
+}
+
+struct DnskeyQueryResult {
+    keys: Vec<DnskeyRecord>,
+    rrsigs: Vec<RrsigRecord>,
+    raw_records: Vec<Record>,
 }
 
 pub struct ChainVerifier {
@@ -127,28 +137,31 @@ impl ChainVerifier {
         _parent_domain: &str,
         child_domain: &str,
     ) -> Result<(), DomainError> {
+        // 1. Query DS records for child zone
         let ds_records = self.query_ds(child_domain).await?;
 
         if ds_records.is_empty() {
-            debug!(domain = %child_domain, "No DS records found (insecure)");
+            debug!(domain = %child_domain, "No DS records found (insecure delegation)");
             return Err(DomainError::InvalidDnsResponse(
                 "No DS records found".into(),
             ));
         }
 
-        let dnskey_records = self.query_dnskey(child_domain).await?;
+        // 2. Query DNSKEY records (also extracts RRSIGs from same response)
+        let dnskey_result = self.query_dnskey(child_domain).await?;
 
-        if dnskey_records.is_empty() {
+        if dnskey_result.keys.is_empty() {
             warn!(domain = %child_domain, "No DNSKEY records found");
             return Err(DomainError::InvalidDnsResponse(
                 "No DNSKEY records found".into(),
             ));
         }
 
+        // 3. Verify DS → DNSKEY hash: find keys authenticated by parent's DS
         let mut validated_keys = Vec::new();
 
         for ds in &ds_records {
-            for dnskey in &dnskey_records {
+            for dnskey in &dnskey_result.keys {
                 match self.crypto_verifier.verify_ds(ds, dnskey, child_domain) {
                     Ok(true) => {
                         debug!(
@@ -184,8 +197,64 @@ impl ChainVerifier {
             ));
         }
 
+        // 4. Verify RRSIG over DNSKEY set using the DS-authenticated keys
+        // The DNSKEY RRSet is signed by the zone's own KSK (which we just validated via DS)
+        let mut rrsig_ok = false;
+
+        if !dnskey_result.rrsigs.is_empty() && !dnskey_result.raw_records.is_empty() {
+            'outer: for rrsig in &dnskey_result.rrsigs {
+                for key in &validated_keys {
+                    match self.crypto_verifier.verify_rrsig(
+                        rrsig,
+                        key,
+                        child_domain,
+                        &dnskey_result.raw_records,
+                    ) {
+                        Ok(true) => {
+                            debug!(
+                                domain = %child_domain,
+                                key_tag = key.calculate_key_tag(),
+                                "DNSKEY RRSIG verified"
+                            );
+                            rrsig_ok = true;
+                            break 'outer;
+                        }
+                        Ok(false) => {}
+                        Err(e) => {
+                            warn!(error = %e, "RRSIG verification error");
+                        }
+                    }
+                }
+            }
+
+            if !rrsig_ok {
+                warn!(
+                    domain = %child_domain,
+                    "DNSKEY RRSIG verification failed for all keys"
+                );
+                return Err(DomainError::InvalidDnsResponse(
+                    "DNSKEY RRSIG verification failed".into(),
+                ));
+            }
+        } else {
+            debug!(
+                domain = %child_domain,
+                rrsigs = dnskey_result.rrsigs.len(),
+                raw_records = dnskey_result.raw_records.len(),
+                "Skipping RRSIG verification (cache hit or no RRSIGs in response)"
+            );
+        }
+
+        // When RRSIG(DNSKEY) was verified, all keys in the response are authenticated
+        // (KSK + ZSK). Store all of them so ZSKs can be used to verify the final RRset.
+        // When RRSIG was skipped (cache hit), store only DS-matched keys.
+        let keys_to_store = if rrsig_ok {
+            dnskey_result.keys
+        } else {
+            validated_keys
+        };
         self.validated_keys
-            .insert(child_domain.to_string(), validated_keys);
+            .insert(child_domain.to_string(), keys_to_store);
 
         Ok(())
     }
@@ -205,8 +274,19 @@ impl ChainVerifier {
         let result = self.pool_manager.query(domain, &RecordType::DS, 5000).await;
 
         match result {
-            Ok(_upstream_result) => {
-                let records = Vec::new();
+            Ok(upstream_result) => {
+                let mut records = Vec::new();
+
+                for record in &upstream_result.response.raw_answers {
+                    if let RData::DNSSEC(DNSSECRData::DS(ds)) = record.data() {
+                        records.push(DsRecord {
+                            key_tag: ds.key_tag(),
+                            algorithm: u8::from(ds.algorithm()),
+                            digest_type: u8::from(ds.digest_type()),
+                            digest: ds.digest().to_vec(),
+                        });
+                    }
+                }
 
                 debug!(
                     domain = %domain,
@@ -214,7 +294,8 @@ impl ChainVerifier {
                     "DS query successful, caching result"
                 );
 
-                self.dnssec_cache.cache_ds(domain, records.clone(), 3600);
+                let ttl = upstream_result.response.min_ttl.unwrap_or(3600);
+                self.dnssec_cache.cache_ds(domain, records.clone(), ttl);
 
                 Ok(records)
             }
@@ -225,14 +306,19 @@ impl ChainVerifier {
         }
     }
 
-    async fn query_dnskey(&self, domain: &str) -> Result<Vec<DnskeyRecord>, DomainError> {
+    async fn query_dnskey(&self, domain: &str) -> Result<DnskeyQueryResult, DomainError> {
         if let Some(keys) = self.dnssec_cache.get_dnskey(domain) {
             debug!(
                 domain = %domain,
                 count = keys.len(),
                 "DNSKEY cache hit"
             );
-            return Ok(keys);
+            // Cache hit: return keys without raw_records/rrsigs (RRSIG check skipped)
+            return Ok(DnskeyQueryResult {
+                keys,
+                rrsigs: vec![],
+                raw_records: vec![],
+            });
         }
 
         debug!(domain = %domain, "DNSKEY cache miss, querying DNS");
@@ -243,18 +329,65 @@ impl ChainVerifier {
             .await;
 
         match result {
-            Ok(_upstream_result) => {
-                let keys = Vec::new();
+            Ok(upstream_result) => {
+                let mut keys = Vec::new();
+                let mut rrsigs = Vec::new();
+                let mut raw_records = Vec::new();
+
+                for record in &upstream_result.response.raw_answers {
+                    match record.data() {
+                        RData::DNSSEC(DNSSECRData::DNSKEY(dnskey)) => {
+                            let pk = dnskey.public_key();
+                            keys.push(DnskeyRecord {
+                                flags: dnskey.flags(),
+                                protocol: 3,
+                                algorithm: u8::from(<dyn PublicKey>::algorithm(pk)),
+                                public_key: <dyn PublicKey>::public_bytes(pk).to_vec(),
+                            });
+                            raw_records.push(record.clone());
+                        }
+                        RData::DNSSEC(DNSSECRData::RRSIG(rrsig)) => {
+                            let input = rrsig.input();
+                            // Only collect RRSIGs that cover the DNSKEY type
+                            if input.type_covered != hickory_proto::rr::RecordType::DNSKEY {
+                                continue;
+                            }
+                            let Some(type_covered) =
+                                RecordTypeMapper::from_hickory(input.type_covered)
+                            else {
+                                continue;
+                            };
+                            rrsigs.push(RrsigRecord {
+                                type_covered,
+                                algorithm: u8::from(input.algorithm),
+                                labels: input.num_labels,
+                                original_ttl: input.original_ttl,
+                                signature_expiration: input.sig_expiration.get(),
+                                signature_inception: input.sig_inception.get(),
+                                key_tag: input.key_tag,
+                                signer_name: input.signer_name.to_string(),
+                                signature: rrsig.sig().to_vec(),
+                            });
+                        }
+                        _ => {}
+                    }
+                }
 
                 debug!(
                     domain = %domain,
-                    count = keys.len(),
+                    keys = keys.len(),
+                    rrsigs = rrsigs.len(),
                     "DNSKEY query successful, caching result"
                 );
 
-                self.dnssec_cache.cache_dnskey(domain, keys.clone(), 3600);
+                let ttl = upstream_result.response.min_ttl.unwrap_or(3600);
+                self.dnssec_cache.cache_dnskey(domain, keys.clone(), ttl);
 
-                Ok(keys)
+                Ok(DnskeyQueryResult {
+                    keys,
+                    rrsigs,
+                    raw_records,
+                })
             }
             Err(e) => {
                 warn!(domain = %domain, error = %e, "DNSKEY query failed");
@@ -263,19 +396,14 @@ impl ChainVerifier {
         }
     }
 
-    #[allow(dead_code)]
-    async fn query_rrsig(
-        &self,
-        domain: &str,
-        record_type: RecordType,
-    ) -> Result<Vec<RrsigRecord>, DomainError> {
-        debug!(
-            domain = %domain,
-            record_type = ?record_type,
-            "Querying RRSIG records"
-        );
+    pub fn get_zone_keys(&self, zone: &str) -> Option<&Vec<DnskeyRecord>> {
+        self.validated_keys.get(zone)
+    }
 
-        Ok(Vec::new())
+    /// Test-only helper to pre-populate validated zone keys without DNS queries.
+    #[cfg(test)]
+    pub fn insert_zone_keys_for_test(&mut self, zone: &str, keys: Vec<DnskeyRecord>) {
+        self.validated_keys.insert(zone.to_string(), keys);
     }
 
     fn split_domain(domain: &str) -> Vec<String> {
@@ -302,5 +430,139 @@ impl ChainVerifier {
         }
 
         Some(format!("{}.", parts[1..].join(".")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dns::dnssec::cache::DnssecCache;
+    use crate::dns::dnssec::trust_anchor::TrustAnchorStore;
+    use crate::dns::events::QueryEventEmitter;
+    use crate::dns::load_balancer::PoolManager;
+    use ferrous_dns_domain::{UpstreamPool, UpstreamStrategy};
+    use std::sync::Arc;
+
+    fn make_chain_verifier() -> ChainVerifier {
+        let pool = UpstreamPool {
+            name: "test".into(),
+            strategy: UpstreamStrategy::Parallel,
+            priority: 1,
+            servers: vec!["udp://127.0.0.1:5353".into()],
+            weight: None,
+        };
+        let pm = Arc::new(
+            PoolManager::new(vec![pool], None, QueryEventEmitter::new_disabled()).unwrap(),
+        );
+        ChainVerifier::new(pm, TrustAnchorStore::empty(), Arc::new(DnssecCache::new()))
+    }
+
+    // -------------------------------------------------------------------------
+    // get_zone_keys
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_get_zone_keys_returns_none_on_empty_chain() {
+        let verifier = make_chain_verifier();
+        assert!(verifier.get_zone_keys("example.com.").is_none());
+        assert!(verifier.get_zone_keys(".").is_none());
+        assert!(verifier.get_zone_keys("com.").is_none());
+    }
+
+    #[test]
+    fn test_get_zone_keys_returns_inserted_keys() {
+        let mut verifier = make_chain_verifier();
+        let key = DnskeyRecord {
+            flags: 256,
+            protocol: 3,
+            algorithm: 15,
+            public_key: vec![0u8; 32],
+        };
+        verifier.insert_zone_keys_for_test("example.com.", vec![key.clone()]);
+
+        let stored = verifier.get_zone_keys("example.com.").unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0], key);
+    }
+
+    #[test]
+    fn test_get_zone_keys_returns_ksk_and_zsk_after_rrsig_verification() {
+        // Simulates the "rrsig_ok = true" branch: all keys (KSK + ZSK) are stored.
+        let mut verifier = make_chain_verifier();
+        let ksk = DnskeyRecord {
+            flags: 257,
+            protocol: 3,
+            algorithm: 8,
+            public_key: vec![1, 2, 3, 4],
+        };
+        let zsk = DnskeyRecord {
+            flags: 256,
+            protocol: 3,
+            algorithm: 8,
+            public_key: vec![5, 6, 7, 8],
+        };
+        verifier.insert_zone_keys_for_test("example.com.", vec![ksk.clone(), zsk.clone()]);
+
+        let stored = verifier.get_zone_keys("example.com.").unwrap();
+        assert_eq!(stored.len(), 2);
+        assert!(
+            stored.iter().any(|k| k.flags == 257),
+            "KSK should be stored"
+        );
+        assert!(
+            stored.iter().any(|k| k.flags == 256),
+            "ZSK should be stored"
+        );
+    }
+
+    #[test]
+    fn test_get_zone_keys_multiple_zones_are_independent() {
+        let mut verifier = make_chain_verifier();
+        let key_a = DnskeyRecord {
+            flags: 257,
+            protocol: 3,
+            algorithm: 8,
+            public_key: vec![1],
+        };
+        let key_b = DnskeyRecord {
+            flags: 256,
+            protocol: 3,
+            algorithm: 15,
+            public_key: vec![0u8; 32],
+        };
+        verifier.insert_zone_keys_for_test("com.", vec![key_a]);
+        verifier.insert_zone_keys_for_test("example.com.", vec![key_b]);
+
+        assert_eq!(verifier.get_zone_keys("com.").unwrap().len(), 1);
+        assert_eq!(verifier.get_zone_keys("example.com.").unwrap().len(), 1);
+        assert!(verifier.get_zone_keys("net.").is_none());
+    }
+
+    // -------------------------------------------------------------------------
+    // split_domain (private, tested here)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_split_domain_root_is_empty() {
+        assert!(ChainVerifier::split_domain(".").is_empty());
+        assert!(ChainVerifier::split_domain("").is_empty());
+    }
+
+    #[test]
+    fn test_split_domain_tld_gives_single_label() {
+        assert_eq!(ChainVerifier::split_domain("com"), vec!["com"]);
+        assert_eq!(ChainVerifier::split_domain("com."), vec!["com"]);
+    }
+
+    #[test]
+    fn test_split_domain_two_labels_reversed() {
+        let labels = ChainVerifier::split_domain("example.com.");
+        assert_eq!(labels, vec!["com", "example"]);
+    }
+
+    #[test]
+    fn test_split_domain_three_labels_reversed() {
+        let labels = ChainVerifier::split_domain("www.example.com.");
+        assert_eq!(labels, vec!["com", "example", "www"]);
     }
 }
