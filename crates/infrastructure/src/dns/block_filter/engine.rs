@@ -21,8 +21,6 @@ use tracing::{error, info, warn};
 
 type GroupL0Cache = LruCache<IpAddr, (i64, u64), FxBuildHasher>;
 
-/// Matches the L0 decision cache capacity so client-group lookups
-/// never thrash before domain decisions do on networks with many devices.
 const GROUP_L0_CAPACITY: usize = 256;
 
 thread_local! {
@@ -161,12 +159,8 @@ impl BlockFilterEnginePort for BlockFilterEngine {
 
     #[inline]
     fn check(&self, domain: &str, group_id: i64) -> FilterDecision {
-        // Compute the combined (domain, group_id) hash once and reuse it
-        // across all L0 / L1 cache lookups — avoids hashing up to 4 times
-        // on a full miss path.
         let key = decision_key(domain, group_id);
 
-        // L0: thread-local decision cache
         if let Some(cached_source) = decision_l0_get_by_key(key) {
             return match cached_source {
                 Some(source) => FilterDecision::Block(source),
@@ -174,7 +168,6 @@ impl BlockFilterEnginePort for BlockFilterEngine {
             };
         }
 
-        // L1: shared decision cache
         if let Some(cached_source) = self.decision_cache.get_by_key(key) {
             decision_l0_set_by_key(key, cached_source);
             return match cached_source {
@@ -183,7 +176,6 @@ impl BlockFilterEnginePort for BlockFilterEngine {
             };
         }
 
-        // Full block filter pipeline
         let guard = self.index.load();
         let block_source = guard.is_blocked(domain, group_id);
 

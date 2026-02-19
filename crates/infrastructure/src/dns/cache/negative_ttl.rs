@@ -37,11 +37,6 @@ impl NegativeQueryTracker {
         }
     }
 
-    /// Record a negative response for `domain` and return the appropriate TTL.
-    ///
-    /// Accepts `&Arc<str>` so callers that already own an `Arc<str>` (e.g.
-    /// `CachedResolver`) can pass `Arc::clone` instead of `Arc::from(&str)`,
-    /// saving one heap allocation per NXDOMAIN resolution.
     pub fn record_and_get_ttl(&self, domain: &Arc<str>) -> u32 {
         let domain_arc = Arc::clone(domain);
 

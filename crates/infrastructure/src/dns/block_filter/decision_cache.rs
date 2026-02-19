@@ -14,7 +14,6 @@ const TTL_SECS: u64 = 60;
 const L0_CAPACITY: usize = 256;
 const L1_CAPACITY: usize = 100_000;
 
-/// Cache encoding: 0 = allow, 1 = Blocklist, 2 = ManagedDomain, 3 = RegexFilter
 const CACHE_ALLOW: u8 = 0;
 
 fn encode_source(source: Option<BlockSource>) -> u8 {
@@ -32,12 +31,6 @@ fn decode_source(val: u8) -> Option<BlockSource> {
     }
 }
 
-/// Fixed-seed ahash state shared across all threads.
-///
-/// Using `ahash::RandomState` with AES-NI gives 30–50% faster hashing
-/// than `FxHasher` for domain strings > 16 bytes.  Fixed seeds ensure
-/// all threads produce identical hashes for the same (domain, group_id)
-/// pair — required for L0 ↔ L1 cache consistency.
 static DECISION_HASH_STATE: OnceLock<AHashRandomState> = OnceLock::new();
 
 #[inline]
@@ -52,9 +45,6 @@ fn decision_hash_state() -> &'static AHashRandomState {
     })
 }
 
-/// Compute the combined hash key for a (domain, group_id) pair.
-/// Exposed so callers (e.g. `engine.rs::check`) can compute it once and
-/// reuse it across all L0 / L1 lookups instead of hashing 4 times.
 #[inline]
 pub fn decision_key(domain: &str, group_id: i64) -> u64 {
     let mut h = decision_hash_state().build_hasher();
@@ -63,7 +53,6 @@ pub fn decision_key(domain: &str, group_id: i64) -> u64 {
     h.finish()
 }
 
-// (encoded_source, timestamp)
 type BlockL0Cache = LruCache<u64, (u8, u64), FxBuildHasher>;
 
 thread_local! {
@@ -74,9 +63,6 @@ thread_local! {
         ));
 }
 
-/// Returns `None` on cache miss, `Some(None)` for cached allow, `Some(Some(source))` for cached block.
-/// Accepts a pre-computed key from [`decision_key`] — compute the key once
-/// and reuse it across all L0 / L1 lookups.
 #[inline]
 pub fn decision_l0_get_by_key(key: u64) -> Option<Option<BlockSource>> {
     BLOCK_L0.with(|c| {
@@ -91,8 +77,6 @@ pub fn decision_l0_get_by_key(key: u64) -> Option<Option<BlockSource>> {
     })
 }
 
-/// Store a decision in the L0 thread-local cache.
-/// Accepts a pre-computed key from [`decision_key`].
 #[inline]
 pub fn decision_l0_set_by_key(key: u64, source: Option<BlockSource>) {
     BLOCK_L0.with(|c| {
@@ -105,17 +89,6 @@ pub fn decision_l0_clear() {
     BLOCK_L0.with(|c| c.borrow_mut().clear());
 }
 
-/// Shared L1 block-decision cache backed by a lock-free `DashMap`.
-///
-/// Replaces the previous `Mutex<LruCache>` design.  Since every entry carries
-/// a TTL timestamp, strict LRU ordering is not required for correctness: stale
-/// entries are rejected on read and overwritten on the next write.  The
-/// `DashMap` lets multiple tokio worker threads read and write concurrently
-/// without serialising through a single global mutex.
-///
-/// When the map exceeds `L1_CAPACITY` entries, new inserts are dropped to
-/// bound memory.  The TTL (60 s) ensures natural turnover so the map does not
-/// fill with stale data under normal load.
 pub struct BlockDecisionCache {
     inner: DashMap<u64, (u8, u64), FxBuildHasher>,
     len: AtomicUsize,
@@ -129,8 +102,6 @@ impl BlockDecisionCache {
         }
     }
 
-    /// Returns `None` on cache miss, `Some(None)` for cached allow, `Some(Some(source))` for cached block.
-    /// Accepts a pre-computed key from [`decision_key`].
     #[inline]
     pub fn get_by_key(&self, key: u64) -> Option<Option<BlockSource>> {
         if let Some(entry) = self.inner.get(&key) {
@@ -138,9 +109,6 @@ impl BlockDecisionCache {
             if coarse_now_secs().saturating_sub(inserted_at) < TTL_SECS {
                 return Some(decode_source(encoded));
             }
-            // Entry is stale — drop the shared ref before removing.
-            // Only decrement len if this thread actually performed the remove
-            // (another concurrent reader might race to evict the same key).
             drop(entry);
             if self.inner.remove(&key).is_some() {
                 self.len.fetch_sub(1, AtomicOrdering::Relaxed);
@@ -149,12 +117,8 @@ impl BlockDecisionCache {
         None
     }
 
-    /// Store a decision. Accepts a pre-computed key from [`decision_key`].
     #[inline]
     pub fn set_by_key(&self, key: u64, source: Option<BlockSource>) {
-        // Bound memory: skip insert when the cache is at capacity.
-        // Stale entries will be evicted organically by `get()` reads or
-        // by the next `clear()` call on blocklist reload.
         if self.len.load(AtomicOrdering::Relaxed) >= L1_CAPACITY {
             return;
         }

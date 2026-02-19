@@ -9,8 +9,6 @@ pub struct CacheKey {
 }
 
 impl CacheKey {
-    /// Create a key by cloning an existing `Arc<str>` — zero heap allocation.
-    /// Use this in the hot path where the caller already holds an `Arc<str>`.
     #[inline]
     pub fn new(domain: Arc<str>, record_type: RecordType) -> Self {
         Self {
@@ -19,8 +17,6 @@ impl CacheKey {
         }
     }
 
-    /// Create a key from a plain `&str` — allocates an `Arc`.
-    /// Use only in non-hot paths (eviction, TTL queries, tests).
     #[inline]
     pub fn from_str(domain: &str, record_type: RecordType) -> Self {
         Self {

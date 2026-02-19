@@ -21,14 +21,6 @@ pub struct DnsCacheConfig {
     pub adaptive_thresholds: bool,
     pub min_frequency: u64,
     pub min_lfuk_score: f64,
-    /// Number of DashMap shards for the L2 cache.
-    ///
-    /// Higher shard counts reduce lock contention on many-core systems but
-    /// increase memory overhead.  A good rule of thumb is 4× the number of
-    /// CPU cores, rounded up to a power of two.
-    ///
-    /// Defaults to 64 (suitable for most servers).  For a Raspberry Pi
-    /// (4 cores) a value of 16 reduces RAM use by ~5 MB.
     pub shard_amount: usize,
 }
 
@@ -120,14 +112,10 @@ impl DnsCache {
             return Some((CachedData::IpAddresses(arc_data), None, Some(remaining_ttl)));
         }
 
-        // Arc::clone is a single atomic refcount increment (~5 ns) — no string copy.
         let key = CacheKey::new(Arc::clone(domain), *record_type);
         if let Some(entry) = self.cache.get(&key) {
             let record = entry.value();
 
-            // coarse_now_secs() is an AtomicU64 load (~3 ns) — no VDSO/syscall.
-            // All expiry checks use second-level precision, which is sufficient
-            // for DNS TTL management.
             let now_secs = coarse_now_secs();
 
             if record.is_stale_usable_at_secs(now_secs) {
@@ -135,7 +123,6 @@ impl DnsCache {
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
                 self.promote_to_l1(domain.as_ref(), record_type, record, now_secs);
-                // Stale-but-usable: TTL already past, report 0 to the caller.
                 return Some((record.data.clone(), Some(record.dnssec_status), Some(0)));
             }
 
@@ -171,8 +158,6 @@ impl DnsCache {
     ) {
         let key = CacheKey::from_str(domain, record_type);
 
-        // Size check before acquiring the entry lock to avoid deadlocking
-        // with DashMap's internal shard locking in len().
         if self.cache.len() >= self.max_entries {
             self.evict_entries();
         }
@@ -180,9 +165,6 @@ impl DnsCache {
         let use_lfuk = matches!(self.eviction_strategy, EvictionStrategy::LFUK);
         let record = CachedRecord::new(data.clone(), ttl, record_type, use_lfuk, dnssec_status);
 
-        // Single write-lock via entry() replaces the previous contains_key (read
-        // lock) + insert (write lock) pair, eliminating one lock acquisition and
-        // the TOCTOU race between them.
         match self.cache.entry(key) {
             dashmap::Entry::Vacant(e) => {
                 self.bloom.set(e.key());
@@ -285,12 +267,9 @@ impl DnsCache {
         now_secs: u64,
     ) {
         if let CachedData::IpAddresses(ref addresses) = record.data {
-            // Use remaining TTL (expires_at_secs − now_secs) so L1 never
-            // serves a record past its L2 expiry.
-            // Example: TTL=300, promoted at T=150 → remaining=150, not 300.
             let remaining_secs = match record.expires_at_secs.checked_sub(now_secs) {
                 Some(r) if r > 0 => r as u32,
-                _ => return, // already expired, skip promotion
+                _ => return,
             };
 
             l1_insert(domain, record_type, Arc::clone(addresses), remaining_secs);
@@ -398,8 +377,6 @@ impl DnsCache {
                 let access_time = record.last_access.load(AtomicOrdering::Relaxed) as f64;
                 let hits = record.hit_count.load(AtomicOrdering::Relaxed) as f64;
                 let now = coarse_now_secs() as f64;
-                // inserted_at_secs is a Unix timestamp; `age` here represents
-                // approximately the insertion epoch (matching prior behaviour).
                 let age = record.inserted_at_secs as f64;
                 let k_value = 0.5;
                 let score = hits / (age.powf(k_value).max(1.0)) * (1.0 / (now - access_time + 1.0));

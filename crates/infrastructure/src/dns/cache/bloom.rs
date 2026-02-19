@@ -4,9 +4,6 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 pub struct AtomicBloom {
     bits: Vec<AtomicU64>,
-    /// Bitmask = `num_bits - 1` where `num_bits` is always a power of two.
-    /// `nth_hash` uses `& mask` instead of `% num_bits`, replacing integer
-    /// division (~30–40 cycles) with a single AND (~1 cycle).
     mask: u64,
     num_hashes: usize,
 }
@@ -31,10 +28,6 @@ impl AtomicBloom {
         let mask = self.mask;
 
         if num_hashes == 5 {
-            // Short-circuit evaluation: on a cache miss (the common rejection case)
-            // we can return false after the very first zero bit, saving up to 4
-            // atomic loads (~3 ns each).  The original code evaluated all 5 and
-            // then ANDed — fast for hits but wasteful for misses.
             let idx0 = Self::nth_hash(h1, h2, 0, mask);
             if self.bits[idx0 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx0 % 64)) == 0 {
                 return false;
@@ -116,25 +109,15 @@ impl AtomicBloom {
         (h1, h2)
     }
 
-    /// Compute the n-th probe index using a pre-computed bitmask.
-    ///
-    /// `mask` must equal `num_bits - 1` where `num_bits` is a power of two.
-    /// The `& mask` replaces the old `% num_bits` (integer division, ~30–40
-    /// cycles) with a single bitwise AND (~1 cycle), saving ~150 cycles on a
-    /// full 5-probe check.
     #[inline]
     fn nth_hash(h1: u64, h2: u64, n: u64, mask: u64) -> usize {
         (h1.wrapping_add(n.wrapping_mul(h2)) & mask) as usize
     }
 
-    /// Returns the optimal bloom filter size **rounded up to the next power of
-    /// two**.  Rounding up means `num_bits >= m_optimal`, so the actual FP rate
-    /// is ≤ the requested `fp_rate` — correctness is preserved.
     fn optimal_num_bits(capacity: usize, fp_rate: f64) -> usize {
         let n = capacity as f64;
         let p = fp_rate;
         let m = (-(n * p.ln()) / (2.0_f64.ln().powi(2))).ceil() as usize;
-        // Round up to a power of two so the bitmask trick in nth_hash works.
         m.next_power_of_two()
     }
 
