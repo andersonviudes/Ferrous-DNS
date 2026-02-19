@@ -1,5 +1,5 @@
 use ferrous_dns_domain::RecordType;
-use ferrous_dns_infrastructure::dns::{CachedData, DnsCache, EvictionStrategy};
+use ferrous_dns_infrastructure::dns::{CachedData, DnsCache, DnsCacheConfig, EvictionStrategy};
 use std::net::IpAddr;
 use std::sync::Arc;
 
@@ -14,17 +14,17 @@ fn create_cache(
     min_frequency: u64,
     min_lfuk_score: f64,
 ) -> DnsCache {
-    DnsCache::new(
+    DnsCache::new(DnsCacheConfig {
         max_entries,
-        strategy,
-        2.0,  // min_threshold (hit rate)
-        0.75, // refresh_threshold
-        10,   // lfuk_history_size
-        0.2,  // batch_eviction_percentage
-        false, // adaptive_thresholds
+        eviction_strategy: strategy,
+        min_threshold: 2.0,
+        refresh_threshold: 0.75,
+        lfuk_history_size: 10,
+        batch_eviction_percentage: 0.2,
+        adaptive_thresholds: false,
         min_frequency,
         min_lfuk_score,
-    )
+    })
 }
 
 #[test]
