@@ -58,6 +58,8 @@ pub async fn get_config(State(state): State<AppState>) -> Json<ConfigResponse> {
             cache_min_hit_rate: config.dns.cache_min_hit_rate,
             cache_min_frequency: config.dns.cache_min_frequency,
             cache_min_lfuk_score: config.dns.cache_min_lfuk_score,
+            cache_compaction_interval: config.dns.cache_compaction_interval,
+            cache_refresh_threshold: config.dns.cache_refresh_threshold,
             cache_optimistic_refresh: config.dns.cache_optimistic_refresh,
             cache_adaptive_thresholds: config.dns.cache_adaptive_thresholds,
             block_non_fqdn: config.dns.block_non_fqdn,
