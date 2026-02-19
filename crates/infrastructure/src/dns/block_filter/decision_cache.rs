@@ -112,9 +112,12 @@ impl BlockDecisionCache {
                 return Some(decode_source(encoded));
             }
             // Entry is stale — drop the shared ref before removing.
+            // Only decrement len if this thread actually performed the remove
+            // (another concurrent reader might race to evict the same key).
             drop(entry);
-            self.inner.remove(&key);
-            self.len.fetch_sub(1, AtomicOrdering::Relaxed);
+            if self.inner.remove(&key).is_some() {
+                self.len.fetch_sub(1, AtomicOrdering::Relaxed);
+            }
         }
         None
     }
@@ -128,10 +131,15 @@ impl BlockDecisionCache {
             return;
         }
         let key = decision_key(domain, group_id);
-        let is_new = !self.inner.contains_key(&key);
-        self.inner.insert(key, (encode_source(source), coarse_now_secs()));
-        if is_new {
-            self.len.fetch_add(1, AtomicOrdering::Relaxed);
+        let value = (encode_source(source), coarse_now_secs());
+        match self.inner.entry(key) {
+            dashmap::Entry::Vacant(e) => {
+                e.insert(value);
+                self.len.fetch_add(1, AtomicOrdering::Relaxed);
+            }
+            dashmap::Entry::Occupied(mut e) => {
+                e.insert(value);
+            }
         }
     }
 
