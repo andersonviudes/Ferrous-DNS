@@ -334,22 +334,6 @@
 
                 <div x-show="settings.conditional_forwarding_enabled" x-cloak
                      style="border-top:1px solid var(--border-color);padding-top:16px">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:16px">
-                        <div>
-                            <label>Local network in CIDR notation</label>
-                            <input type="text" x-model="settings.local_network_cidr" placeholder="192.168.0.0/24"
-                                   style="font-family:monospace">
-                            <p style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Example: 192.168.0.0/24
-                                or 10.0.0.0/8</p>
-                        </div>
-                        <div>
-                            <label>IP address of your DHCP server (router)</label>
-                            <input type="text" x-model="settings.router_ip" placeholder="192.168.0.1"
-                                   style="font-family:monospace">
-                            <p style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Usually your router's
-                                IP</p>
-                        </div>
-                    </div>
                     <div style="margin-bottom:16px">
                         <label>Local domain name (optional)</label>
                         <input type="text" x-model="settings.local_domain" placeholder="fritz.box"
@@ -611,8 +595,6 @@
                 never_forward_non_fqdn: false,
                 never_forward_reverse_lookups: false,
                 conditional_forwarding_enabled: false,
-                local_network_cidr: '',
-                router_ip: '',
                 local_domain: ''
             },
             cacheStats: {total_entries: 0, hit_rate: 0, total_hits: 0, total_misses: 0},
@@ -795,8 +777,6 @@
             toggleConditionalForwarding() {
                 this.settings.conditional_forwarding_enabled = !this.settings.conditional_forwarding_enabled;
                 if (!this.settings.conditional_forwarding_enabled) {
-                    this.settings.local_network_cidr = '';
-                    this.settings.router_ip = '';
                     this.settings.local_domain = ''
                 }
             },

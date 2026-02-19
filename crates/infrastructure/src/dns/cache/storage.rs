@@ -20,6 +20,8 @@ pub struct DnsCache {
     pub(super) lfuk_history_size: usize,
     pub(super) batch_eviction_percentage: f64,
     pub(super) adaptive_thresholds: bool,
+    pub(super) min_frequency: u64,
+    pub(super) min_lfuk_score: f64,
     pub(super) metrics: Arc<CacheMetrics>,
     pub(super) compaction_counter: Arc<AtomicUsize>,
     pub(super) use_probabilistic_eviction: bool,
@@ -35,6 +37,8 @@ impl DnsCache {
         lfuk_history_size: usize,
         batch_eviction_percentage: f64,
         adaptive_thresholds: bool,
+        min_frequency: u64,
+        min_lfuk_score: f64,
     ) -> Self {
         info!(
             max_entries,
@@ -58,6 +62,8 @@ impl DnsCache {
             lfuk_history_size,
             batch_eviction_percentage,
             adaptive_thresholds,
+            min_frequency,
+            min_lfuk_score,
             metrics: Arc::new(CacheMetrics::default()),
             compaction_counter: Arc::new(AtomicUsize::new(0)),
             use_probabilistic_eviction: true,
@@ -324,7 +330,14 @@ impl DnsCache {
     pub(super) fn compute_score(&self, record: &CachedRecord) -> f64 {
         match self.eviction_strategy {
             EvictionStrategy::LRU => record.last_access.load(AtomicOrdering::Relaxed) as f64,
-            EvictionStrategy::LFU => record.hit_count.load(AtomicOrdering::Relaxed) as f64,
+            EvictionStrategy::LFU => {
+                let hits = record.hit_count.load(AtomicOrdering::Relaxed);
+                if self.min_frequency > 0 && hits < self.min_frequency {
+                    -(self.min_frequency as f64 - hits as f64)
+                } else {
+                    hits as f64
+                }
+            }
             EvictionStrategy::HitRate => {
                 let hits = record.hit_count.load(AtomicOrdering::Relaxed);
                 let total = hits + 1;
@@ -341,7 +354,13 @@ impl DnsCache {
                 let inserted_unix = record.inserted_at.elapsed().as_secs() as f64;
                 let age = now - inserted_unix;
                 let k_value = 0.5;
-                hits / (age.powf(k_value).max(1.0)) * (1.0 / (now - access_time + 1.0))
+                let score =
+                    hits / (age.powf(k_value).max(1.0)) * (1.0 / (now - access_time + 1.0));
+                if self.min_lfuk_score > 0.0 && score < self.min_lfuk_score {
+                    score - self.min_lfuk_score
+                } else {
+                    score
+                }
             }
         }
     }

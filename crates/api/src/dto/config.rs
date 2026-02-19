@@ -38,8 +38,6 @@ pub struct DnsConfigResponse {
     pub block_private_ptr: bool,
     pub local_domain: Option<String>,
     pub conditional_forwarding: Vec<ConditionalForwardingResponse>,
-    pub conditional_forward_network: Option<String>,
-    pub conditional_forward_router: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -122,12 +120,6 @@ pub struct SettingsDto {
     pub conditional_forwarding_enabled: bool,
 
     #[serde(default)]
-    pub local_network_cidr: String,
-
-    #[serde(default)]
-    pub router_ip: String,
-
-    #[serde(default)]
     pub local_domain: String,
 }
 
@@ -144,8 +136,6 @@ impl From<ConfigResponse> for SettingsDto {
             never_forward_non_fqdn: config.dns.block_non_fqdn,
             never_forward_reverse_lookups: config.dns.block_private_ptr,
             conditional_forwarding_enabled: !config.dns.conditional_forwarding.is_empty(),
-            local_network_cidr: config.dns.conditional_forward_network.unwrap_or_default(),
-            router_ip: config.dns.conditional_forward_router.unwrap_or_default(),
             local_domain: config.dns.local_domain.unwrap_or_default(),
         }
     }

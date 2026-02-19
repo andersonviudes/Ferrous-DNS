@@ -72,8 +72,6 @@ pub async fn get_config(State(state): State<AppState>) -> Json<ConfigResponse> {
                     server: cf.server.clone(),
                 })
                 .collect(),
-            conditional_forward_network: config.dns.conditional_forward_network.clone(),
-            conditional_forward_router: config.dns.conditional_forward_router.clone(),
         },
         blocking: BlockingConfigResponse {
             enabled: config.blocking.enabled,

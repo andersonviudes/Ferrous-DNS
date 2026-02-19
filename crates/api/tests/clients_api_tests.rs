@@ -116,6 +116,8 @@ async fn create_test_app() -> (Router, Arc<SqliteClientRepository>, sqlx::Sqlite
         0,
         0.0,
         false,
+        0,
+        0.0,
     ));
 
     use ferrous_dns_domain::config::upstream::{UpstreamPool, UpstreamStrategy};

@@ -194,6 +194,8 @@ impl DnsServices {
                 config.dns.cache_lfuk_history_size,
                 config.dns.cache_batch_eviction_percentage,
                 config.dns.cache_adaptive_thresholds,
+                config.dns.cache_min_frequency,
+                config.dns.cache_min_lfuk_score,
             ))
         } else {
             Arc::new(DnsCache::new(
@@ -204,6 +206,8 @@ impl DnsServices {
                 0,
                 0.0,
                 false,
+                0,
+                0.0,
             ))
         }
     }
