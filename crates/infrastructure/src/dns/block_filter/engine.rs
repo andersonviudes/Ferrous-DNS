@@ -20,10 +20,14 @@ use tracing::{error, info, warn};
 
 type GroupL0Cache = LruCache<IpAddr, (i64, u64), FxBuildHasher>;
 
+/// Matches the L0 decision cache capacity so client-group lookups
+/// never thrash before domain decisions do on networks with many devices.
+const GROUP_L0_CAPACITY: usize = 256;
+
 thread_local! {
     static GROUP_L0: RefCell<GroupL0Cache> =
         RefCell::new(LruCache::with_hasher(
-            NonZeroUsize::new(32).unwrap(),
+            NonZeroUsize::new(GROUP_L0_CAPACITY).unwrap(),
             FxBuildHasher,
         ));
 }
