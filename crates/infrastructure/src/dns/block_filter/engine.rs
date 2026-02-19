@@ -8,11 +8,33 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use ferrous_dns_application::ports::{BlockFilterEnginePort, FilterDecision};
 use ferrous_dns_domain::{ClientSubnet, DomainError, SubnetMatcher};
+use lru::LruCache;
 use rustc_hash::FxBuildHasher;
 use sqlx::{Row, SqlitePool};
+use std::cell::RefCell;
 use std::net::IpAddr;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tracing::{error, info, warn};
+
+// ---------------------------------------------------------------------------
+// Thread-local group resolution cache (L−1)
+// ---------------------------------------------------------------------------
+
+/// Per-thread LRU mapping IP → (group_id, expiry).
+///
+/// Avoids the DashMap + ArcSwap + CIDR scan (~250 ns) on every query.
+/// TTL of 60 s matches the client-group reload cadence.
+type GroupL0Cache = LruCache<IpAddr, (i64, Instant), FxBuildHasher>;
+
+thread_local! {
+    static GROUP_L0: RefCell<GroupL0Cache> =
+        RefCell::new(LruCache::with_hasher(
+            NonZeroUsize::new(32).unwrap(),
+            FxBuildHasher,
+        ));
+}
 
 /// The Block Filter Engine.
 ///
@@ -81,6 +103,25 @@ impl BlockFilterEngine {
     // Internal helpers
     // ------------------------------------------------------------------
 
+    /// Resolve a client IP to its group_id without consulting the thread-local cache.
+    fn resolve_group_uncached(&self, ip: IpAddr) -> i64 {
+        // 1. Explicit mapping
+        if let Some(gid) = self.client_groups.get(&ip) {
+            return *gid;
+        }
+
+        // 2. CIDR subnet
+        let guard = self.subnet_matcher.load();
+        if let Some(matcher) = guard.as_ref() {
+            if let Some(gid) = matcher.find_group_for_ip(ip) {
+                return gid;
+            }
+        }
+
+        // 3. Default
+        self.default_group_id
+    }
+
     /// Load/reload client→group and subnet→group assignments from the DB.
     async fn load_client_groups_inner(&self) -> Result<(), DomainError> {
         // Explicit IP → group_id
@@ -143,26 +184,32 @@ impl BlockFilterEnginePort for BlockFilterEngine {
     /// Resolve a client IP to its group_id.
     ///
     /// Resolution order:
-    ///   1. Explicit DashMap (~50 ns)
-    ///   2. CIDR SubnetMatcher (~200 ns)
-    ///   3. Default group fallback
+    ///   L−1: thread-local LRU (TTL 60 s)  (~10 ns hit, ≥99% after warmup)
+    ///   1.   Explicit DashMap              (~50 ns)
+    ///   2.   CIDR SubnetMatcher            (~200 ns)
+    ///   3.   Default group fallback
     #[inline]
     fn resolve_group(&self, ip: IpAddr) -> i64 {
-        // 1. Explicit mapping
-        if let Some(gid) = self.client_groups.get(&ip) {
-            return *gid;
-        }
-
-        // 2. CIDR subnet
-        let guard = self.subnet_matcher.load();
-        if let Some(matcher) = guard.as_ref() {
-            if let Some(gid) = matcher.find_group_for_ip(ip) {
-                return gid;
+        // L−1: thread-local cache
+        if let Some(gid) = GROUP_L0.with(|c| {
+            let mut cache = c.borrow_mut();
+            if let Some(&(gid, expires)) = cache.get(&ip) {
+                if Instant::now() < expires {
+                    return Some(gid);
+                }
+                cache.pop(&ip);
             }
+            None
+        }) {
+            return gid;
         }
 
-        // 3. Default
-        self.default_group_id
+        let gid = self.resolve_group_uncached(ip);
+        GROUP_L0.with(|c| {
+            c.borrow_mut()
+                .put(ip, (gid, Instant::now() + Duration::from_secs(60)));
+        });
+        gid
     }
 
     /// Check whether `domain` is blocked for `group_id`.
@@ -235,5 +282,9 @@ impl BlockFilterEnginePort for BlockFilterEngine {
     /// Reload client→group assignments from the `clients` and `client_subnets` tables.
     async fn load_client_groups(&self) -> Result<(), DomainError> {
         self.load_client_groups_inner().await
+    }
+
+    fn compiled_domain_count(&self) -> usize {
+        self.index.load().total_blocked_domains
     }
 }

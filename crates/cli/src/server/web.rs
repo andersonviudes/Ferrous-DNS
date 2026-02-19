@@ -4,7 +4,10 @@ use std::net::SocketAddr;
 use tower_http::services::ServeDir;
 use tracing::info;
 
-pub async fn start_web_server(bind_addr: SocketAddr, state: AppState) -> anyhow::Result<()> {
+pub async fn start_web_server(
+    bind_addr: SocketAddr,
+    state: AppState,
+) -> anyhow::Result<()> {
     info!(
         bind_address = %bind_addr,
         dashboard_url = format!("http://{}", bind_addr),

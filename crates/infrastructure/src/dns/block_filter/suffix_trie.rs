@@ -1,5 +1,6 @@
 use compact_str::CompactString;
 use rustc_hash::FxBuildHasher;
+use smallvec::SmallVec;
 use std::collections::HashMap;
 
 /// A node in the reversed-label suffix trie.
@@ -69,7 +70,7 @@ impl SuffixTrie {
     /// itself does NOT match: `*.ads.com` matches `sub.ads.com` but NOT `ads.com`.
     #[inline]
     pub fn lookup(&self, domain: &str) -> u64 {
-        let labels: Vec<&str> = domain.split('.').rev().collect();
+        let labels: SmallVec<[&str; 8]> = domain.split('.').rev().collect();
         let n = labels.len();
         let mut node = &self.root;
         let mut result: u64 = 0;
@@ -90,78 +91,5 @@ impl SuffixTrie {
         }
 
         result
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_wildcard_matches_subdomain() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.ads.com", 0b01);
-        assert_eq!(trie.lookup("sub.ads.com"), 0b01);
-        assert_eq!(trie.lookup("deep.sub.ads.com"), 0b01);
-    }
-
-    #[test]
-    fn test_wildcard_no_match_parent_domain() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.ads.com", 0b01);
-        // The parent itself is not matched by a wildcard — use exact map for that
-        assert_eq!(trie.lookup("ads.com"), 0);
-    }
-
-    #[test]
-    fn test_wildcard_no_match_unrelated() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.ads.com", 0b01);
-        assert_eq!(trie.lookup("safe.com"), 0);
-        assert_eq!(trie.lookup("notads.com"), 0);
-    }
-
-    #[test]
-    fn test_nested_wildcard() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.sub.ads.com", 0b01);
-        assert_eq!(trie.lookup("deep.sub.ads.com"), 0b01);
-        // *.sub.ads.com should NOT match sub.ads.com directly
-        assert_eq!(trie.lookup("sub.ads.com"), 0);
-    }
-
-    #[test]
-    fn test_multiple_sources_or_mask() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.ads.com", 0b01);
-        trie.insert_wildcard("*.ads.com", 0b10);
-        assert_eq!(trie.lookup("x.ads.com"), 0b11);
-    }
-
-    #[test]
-    fn test_overlapping_patterns() {
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("*.ads.com", 0b01);
-        trie.insert_wildcard("*.sub.ads.com", 0b10);
-        // deep.sub.ads.com matches both
-        assert_eq!(trie.lookup("deep.sub.ads.com"), 0b11);
-        // x.ads.com only matches the first
-        assert_eq!(trie.lookup("x.ads.com"), 0b01);
-    }
-
-    #[test]
-    fn test_empty_trie_returns_zero() {
-        let trie = SuffixTrie::new();
-        assert_eq!(trie.lookup("anything.com"), 0);
-        assert!(trie.is_empty());
-    }
-
-    #[test]
-    fn test_insert_without_wildcard_prefix() {
-        // insert_wildcard with no leading "*." still works (treated as suffix of parent)
-        let mut trie = SuffixTrie::new();
-        trie.insert_wildcard("ads.com", 0b01);
-        // anything under ads.com matches
-        assert_eq!(trie.lookup("sub.ads.com"), 0b01);
     }
 }

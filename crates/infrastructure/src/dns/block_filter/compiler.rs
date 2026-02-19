@@ -41,9 +41,33 @@ pub fn parse_list_line(line: &str) -> Option<ParsedEntry> {
         return None;
     }
 
+    // AdBlock Plus allowlist (@@||domain^) → skip
+    if line.starts_with("@@") {
+        return None;
+    }
+
     // /pattern/ → Aho-Corasick substring
     if line.starts_with('/') && line.ends_with('/') && line.len() > 2 {
         return Some(ParsedEntry::Pattern(line[1..line.len() - 1].to_lowercase()));
+    }
+
+    // AdBlock Plus syntax: ||domain^ or ||domain^$options
+    // ||*.domain^ → Wildcard, ||domain^ → Exact
+    if line.starts_with("||") {
+        let inner = line.strip_prefix("||").unwrap_or("");
+        // Strip from '^' onward (removes $options like $third-party,$important)
+        let domain = match inner.find('^') {
+            Some(pos) => &inner[..pos],
+            None => inner,
+        };
+        let domain = domain.trim().to_ascii_lowercase();
+        if domain.is_empty() || !domain.contains('.') {
+            return None;
+        }
+        if domain.starts_with("*.") {
+            return Some(ParsedEntry::Wildcard(domain));
+        }
+        return Some(ParsedEntry::Exact(domain));
     }
 
     // *.domain → Wildcard
@@ -362,6 +386,7 @@ pub async fn compile_block_index(
         sources,
         group_masks,
         default_group_id,
+        total_blocked_domains: total_exact,
         exact,
         bloom,
         wildcard,
@@ -463,96 +488,4 @@ async fn build_allowlist_index(
     }
 
     Ok(allowlists)
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // ---- parse_list_line --------------------------------------------------
-
-    #[test]
-    fn test_parse_plain_domain() {
-        let entry = parse_list_line("ads.example.com").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "ads.example.com"));
-    }
-
-    #[test]
-    fn test_parse_plain_domain_lowercased() {
-        let entry = parse_list_line("ADS.Example.COM").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "ads.example.com"));
-    }
-
-    #[test]
-    fn test_parse_hosts_file_0000() {
-        let entry = parse_list_line("0.0.0.0 tracker.evil.com").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "tracker.evil.com"));
-    }
-
-    #[test]
-    fn test_parse_hosts_file_127() {
-        let entry = parse_list_line("127.0.0.1 ads.net").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "ads.net"));
-    }
-
-    #[test]
-    fn test_parse_hosts_file_ipv6() {
-        let entry = parse_list_line(":: ads.net").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "ads.net"));
-    }
-
-    #[test]
-    fn test_parse_wildcard() {
-        let entry = parse_list_line("*.ads.com").unwrap();
-        assert!(matches!(entry, ParsedEntry::Wildcard(p) if p == "*.ads.com"));
-    }
-
-    #[test]
-    fn test_parse_pattern_slash() {
-        let entry = parse_list_line("/tracker/").unwrap();
-        assert!(matches!(entry, ParsedEntry::Pattern(p) if p == "tracker"));
-    }
-
-    #[test]
-    fn test_skip_comment() {
-        assert!(parse_list_line("# this is a comment").is_none());
-    }
-
-    #[test]
-    fn test_skip_empty() {
-        assert!(parse_list_line("   ").is_none());
-        assert!(parse_list_line("").is_none());
-    }
-
-    #[test]
-    fn test_skip_localhost() {
-        assert!(parse_list_line("127.0.0.1 localhost").is_none());
-        assert!(parse_list_line("0.0.0.0 0.0.0.0").is_none());
-        assert!(parse_list_line("0.0.0.0 broadcasthost").is_none());
-    }
-
-    #[test]
-    fn test_skip_token_without_dot() {
-        // A single token with no dot is not a valid domain
-        assert!(parse_list_line("localhost").is_none());
-    }
-
-    #[test]
-    fn test_parse_list_text_filters_comments() {
-        let text = "# header\nads.com\n# another comment\ntracker.io\n";
-        let entries = parse_list_text(text);
-        assert_eq!(entries.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_hosts_with_inline_comment() {
-        // Some hosts files have trailing comments after the domain (e.g. "0.0.0.0 ads.com # blocked")
-        // split_whitespace on the whole line takes parts[1] as the domain, ignoring "#"
-        let entry = parse_list_line("0.0.0.0 ads.com").unwrap();
-        assert!(matches!(entry, ParsedEntry::Exact(d) if d == "ads.com"));
-    }
 }

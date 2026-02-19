@@ -613,6 +613,7 @@ dependencies = [
 name = "ferrous-dns-api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "chrono",
  "ferrous-dns-application",

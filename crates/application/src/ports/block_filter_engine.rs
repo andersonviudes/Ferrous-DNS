@@ -46,4 +46,8 @@ pub trait BlockFilterEnginePort: Send + Sync {
     /// Reload client→group assignments from the `clients` and `client_subnets`
     /// tables into the in-memory DashMap and SubnetMatcher.
     async fn load_client_groups(&self) -> Result<(), DomainError>;
+
+    /// Return the total number of unique exact-blocked domains currently
+    /// compiled in the in-memory BlockIndex.
+    fn compiled_domain_count(&self) -> usize;
 }

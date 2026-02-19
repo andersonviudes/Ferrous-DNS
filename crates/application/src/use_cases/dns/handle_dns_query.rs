@@ -3,14 +3,30 @@ use crate::ports::{
     QueryLogRepository,
 };
 use ferrous_dns_domain::{DnsQuery, DnsRequest, DomainError, QueryLog, QuerySource};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+// ---------------------------------------------------------------------------
+// Thread-local client tracking rate limiter
+// ---------------------------------------------------------------------------
+
+// Per-thread map from client IP to the last time `update_last_seen` was spawned.
+// Suppresses redundant DB spawns when the same IP sends queries faster than
+// once per 60 s. Reduces SQLite write pressure dramatically at high QPS.
+thread_local! {
+    static LAST_SEEN_TRACKER: RefCell<HashMap<IpAddr, Instant>> =
+        RefCell::new(HashMap::new());
+}
 
 pub struct HandleDnsQueryUseCase {
     resolver: Arc<dyn DnsResolver>,
     block_filter: Arc<dyn BlockFilterEnginePort>,
     query_log: Arc<dyn QueryLogRepository>,
     client_repo: Option<Arc<dyn ClientRepository>>,
+    client_tracking_interval: Duration,
 }
 
 impl HandleDnsQueryUseCase {
@@ -24,11 +40,17 @@ impl HandleDnsQueryUseCase {
             block_filter,
             query_log,
             client_repo: None,
+            client_tracking_interval: Duration::from_secs(60),
         }
     }
 
-    pub fn with_client_tracking(mut self, client_repo: Arc<dyn ClientRepository>) -> Self {
+    pub fn with_client_tracking(
+        mut self,
+        client_repo: Arc<dyn ClientRepository>,
+        interval_secs: u64,
+    ) -> Self {
         self.client_repo = Some(client_repo);
+        self.client_tracking_interval = Duration::from_secs(interval_secs);
         self
     }
 
@@ -36,13 +58,29 @@ impl HandleDnsQueryUseCase {
         let start = Instant::now();
 
         if let Some(client_repo) = &self.client_repo {
-            let client_repo = Arc::clone(client_repo);
-            let client_ip = request.client_ip;
-            tokio::spawn(async move {
-                if let Err(e) = client_repo.update_last_seen(client_ip).await {
-                    tracing::warn!(error = %e, ip = %client_ip, "Failed to track client");
+            let needs_update = LAST_SEEN_TRACKER.with(|t| {
+                let mut tracker = t.borrow_mut();
+                let now = Instant::now();
+                match tracker.get(&request.client_ip) {
+                    Some(&last) if now.duration_since(last) < self.client_tracking_interval => {
+                        false
+                    }
+                    _ => {
+                        tracker.insert(request.client_ip, now);
+                        true
+                    }
                 }
             });
+
+            if needs_update {
+                let client_repo = Arc::clone(client_repo);
+                let client_ip = request.client_ip;
+                tokio::spawn(async move {
+                    if let Err(e) = client_repo.update_last_seen(client_ip).await {
+                        tracing::warn!(error = %e, ip = %client_ip, "Failed to track client");
+                    }
+                });
+            }
         }
 
         // Resolve which group this client belongs to
@@ -69,9 +107,12 @@ impl HandleDnsQueryUseCase {
                 group_id: Some(group_id),
             };
 
-            if let Err(e) = self.query_log.log_query(&query_log).await {
-                tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log blocked query");
-            }
+            let log_repo = Arc::clone(&self.query_log);
+            tokio::spawn(async move {
+                if let Err(e) = log_repo.log_query(&query_log).await {
+                    tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log blocked query");
+                }
+            });
 
             return Err(DomainError::Blocked);
         }
@@ -99,9 +140,12 @@ impl HandleDnsQueryUseCase {
                     group_id: Some(group_id),
                 };
 
-                if let Err(e) = self.query_log.log_query(&query_log).await {
-                    tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log query");
-                }
+                let log_repo = Arc::clone(&self.query_log);
+                tokio::spawn(async move {
+                    if let Err(e) = log_repo.log_query(&query_log).await {
+                        tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log query");
+                    }
+                });
 
                 Ok(resolution)
             }
@@ -130,9 +174,12 @@ impl HandleDnsQueryUseCase {
                     group_id: Some(group_id),
                 };
 
-                if let Err(log_err) = self.query_log.log_query(&query_log).await {
-                    tracing::warn!(error = %log_err, "Failed to log error query");
-                }
+                let log_repo = Arc::clone(&self.query_log);
+                tokio::spawn(async move {
+                    if let Err(log_err) = log_repo.log_query(&query_log).await {
+                        tracing::warn!(error = %log_err, "Failed to log error query");
+                    }
+                });
 
                 Err(e)
             }

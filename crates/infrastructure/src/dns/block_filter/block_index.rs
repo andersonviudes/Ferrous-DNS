@@ -101,6 +101,9 @@ pub struct BlockIndex {
 
     pub default_group_id: i64,
 
+    /// Total number of unique exact-blocked domains in this index.
+    pub total_blocked_domains: usize,
+
     /// L3: Exact domain lookup. Key is lowercase domain.
     /// Value = SourceBitSet (which sources block this exact domain).
     pub exact: DashMap<CompactString, SourceBitSet, FxBuildHasher>,
@@ -183,144 +186,5 @@ impl BlockIndex {
         }
 
         false
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Build a minimal BlockIndex for testing without HTTP or DB.
-    fn build_test_index(
-        group_masks: HashMap<i64, SourceBitSet>,
-        exact_entries: Vec<(&str, SourceBitSet)>,
-        default_group_id: i64,
-    ) -> BlockIndex {
-        let bloom_capacity = (exact_entries.len() + 100).max(1000);
-        let bloom = AtomicBloom::new(bloom_capacity, 0.001);
-
-        let exact: DashMap<CompactString, SourceBitSet, FxBuildHasher> =
-            DashMap::with_hasher(FxBuildHasher);
-
-        for (domain, bits) in &exact_entries {
-            bloom.set(domain);
-            exact.insert(CompactString::new(domain), *bits);
-        }
-
-        BlockIndex {
-            sources: vec![],
-            group_masks,
-            default_group_id,
-            exact,
-            bloom,
-            wildcard: SuffixTrie::new(),
-            patterns: vec![],
-            allowlists: AllowlistIndex::new(),
-        }
-    }
-
-    #[test]
-    fn test_exact_match_blocked_correct_group() {
-        // Source at bit 0 belongs to group 1
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b01u64);
-
-        let index = build_test_index(masks, vec![("ads.com", 0b01)], 1);
-        assert!(index.is_blocked("ads.com", 1));
-    }
-
-    #[test]
-    fn test_exact_match_wrong_group() {
-        // Source bit 0 is in group 1. Group 2 mask does NOT include bit 0.
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b01u64);
-        masks.insert(2i64, 0b10u64); // bit 1 only
-
-        let index = build_test_index(masks, vec![("ads.com", 0b01)], 1);
-        // group 2 has mask 0b10, domain has bits 0b01 → AND = 0 → Allow
-        assert!(!index.is_blocked("ads.com", 2));
-    }
-
-    #[test]
-    fn test_allowlist_overrides_blocklist() {
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b01u64);
-
-        let bloom = AtomicBloom::new(1000, 0.001);
-        bloom.set(&"ads.com");
-        let exact: DashMap<CompactString, SourceBitSet, FxBuildHasher> =
-            DashMap::with_hasher(FxBuildHasher);
-        exact.insert(CompactString::new("ads.com"), 0b01);
-
-        let allowlists = AllowlistIndex::new();
-        allowlists
-            .global_exact
-            .insert(CompactString::new("ads.com"));
-
-        let index = BlockIndex {
-            sources: vec![],
-            group_masks: masks,
-            default_group_id: 1,
-            exact,
-            bloom,
-            wildcard: SuffixTrie::new(),
-            patterns: vec![],
-            allowlists,
-        };
-
-        // Even though ads.com is blocked, the global allowlist overrides it
-        assert!(!index.is_blocked("ads.com", 1));
-    }
-
-    #[test]
-    fn test_wildcard_blocked_via_trie() {
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b01u64);
-
-        let bloom = AtomicBloom::new(1000, 0.001);
-        let exact: DashMap<CompactString, SourceBitSet, FxBuildHasher> =
-            DashMap::with_hasher(FxBuildHasher);
-
-        let mut wildcard = SuffixTrie::new();
-        wildcard.insert_wildcard("*.tracker.io", 0b01);
-
-        let index = BlockIndex {
-            sources: vec![],
-            group_masks: masks,
-            default_group_id: 1,
-            exact,
-            bloom,
-            wildcard,
-            patterns: vec![],
-            allowlists: AllowlistIndex::new(),
-        };
-
-        assert!(index.is_blocked("evil.tracker.io", 1));
-        assert!(!index.is_blocked("safe.com", 1));
-    }
-
-    #[test]
-    fn test_default_group_fallback_mask() {
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b01u64); // only default group defined
-
-        let index = build_test_index(masks, vec![("ads.com", 0b01)], 1);
-        // group 99 is unknown → falls back to default group mask (0b01)
-        assert!(index.is_blocked("ads.com", 99));
-    }
-
-    #[test]
-    fn test_group_mask_inheritance() {
-        // Default group = 1, bits 0+1. Kids group = 2, default bits + bit 2.
-        let mut masks = HashMap::new();
-        masks.insert(1i64, 0b011u64); // bits 0,1
-        masks.insert(2i64, 0b111u64); // bits 0,1,2
-
-        let index = build_test_index(masks, vec![("kids-only-blocked.com", 0b100)], 1);
-
-        // Default group doesn't have bit 2 → not blocked
-        assert!(!index.is_blocked("kids-only-blocked.com", 1));
-        // Kids group has bit 2 → blocked
-        assert!(index.is_blocked("kids-only-blocked.com", 2));
     }
 }

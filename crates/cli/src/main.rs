@@ -116,6 +116,7 @@ async fn main() -> anyhow::Result<()> {
         create_whitelist_source: use_cases.create_whitelist_source,
         update_whitelist_source: use_cases.update_whitelist_source,
         delete_whitelist_source: use_cases.delete_whitelist_source,
+        get_block_filter_stats: use_cases.get_block_filter_stats,
         subnet_matcher: use_cases.subnet_matcher.clone(),
         config: config_arc,
         cache: dns_services.cache.clone(),
