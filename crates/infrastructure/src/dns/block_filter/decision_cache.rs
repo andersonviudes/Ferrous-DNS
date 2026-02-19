@@ -30,7 +30,11 @@ fn decode_source(val: u8) -> Option<BlockSource> {
     }
 }
 
-fn decision_key(domain: &str, group_id: i64) -> u64 {
+/// Compute the combined hash key for a (domain, group_id) pair.
+/// Exposed so callers (e.g. `engine.rs::check`) can compute it once and
+/// reuse it across all L0 / L1 lookups instead of hashing 4 times.
+#[inline]
+pub fn decision_key(domain: &str, group_id: i64) -> u64 {
     let mut h = FxHasher::default();
     domain.hash(&mut h);
     group_id.hash(&mut h);
@@ -49,11 +53,12 @@ thread_local! {
 }
 
 /// Returns `None` on cache miss, `Some(None)` for cached allow, `Some(Some(source))` for cached block.
+/// Accepts a pre-computed key from [`decision_key`] — compute the key once
+/// and reuse it across all L0 / L1 lookups.
 #[inline]
-pub fn decision_l0_get(domain: &str, group_id: i64) -> Option<Option<BlockSource>> {
+pub fn decision_l0_get_by_key(key: u64) -> Option<Option<BlockSource>> {
     BLOCK_L0.with(|c| {
         let mut c = c.borrow_mut();
-        let key = decision_key(domain, group_id);
         if let Some(&(encoded, inserted_at)) = c.get(&key) {
             if coarse_now_secs().saturating_sub(inserted_at) < TTL_SECS {
                 return Some(decode_source(encoded));
@@ -64,13 +69,13 @@ pub fn decision_l0_get(domain: &str, group_id: i64) -> Option<Option<BlockSource
     })
 }
 
+/// Store a decision in the L0 thread-local cache.
+/// Accepts a pre-computed key from [`decision_key`].
 #[inline]
-pub fn decision_l0_set(domain: &str, group_id: i64, source: Option<BlockSource>) {
+pub fn decision_l0_set_by_key(key: u64, source: Option<BlockSource>) {
     BLOCK_L0.with(|c| {
-        c.borrow_mut().put(
-            decision_key(domain, group_id),
-            (encode_source(source), coarse_now_secs()),
-        );
+        c.borrow_mut()
+            .put(key, (encode_source(source), coarse_now_secs()));
     });
 }
 
@@ -103,9 +108,9 @@ impl BlockDecisionCache {
     }
 
     /// Returns `None` on cache miss, `Some(None)` for cached allow, `Some(Some(source))` for cached block.
+    /// Accepts a pre-computed key from [`decision_key`].
     #[inline]
-    pub fn get(&self, domain: &str, group_id: i64) -> Option<Option<BlockSource>> {
-        let key = decision_key(domain, group_id);
+    pub fn get_by_key(&self, key: u64) -> Option<Option<BlockSource>> {
         if let Some(entry) = self.inner.get(&key) {
             let (encoded, inserted_at) = *entry;
             if coarse_now_secs().saturating_sub(inserted_at) < TTL_SECS {
@@ -122,15 +127,15 @@ impl BlockDecisionCache {
         None
     }
 
+    /// Store a decision. Accepts a pre-computed key from [`decision_key`].
     #[inline]
-    pub fn set(&self, domain: &str, group_id: i64, source: Option<BlockSource>) {
+    pub fn set_by_key(&self, key: u64, source: Option<BlockSource>) {
         // Bound memory: skip insert when the cache is at capacity.
         // Stale entries will be evicted organically by `get()` reads or
         // by the next `clear()` call on blocklist reload.
         if self.len.load(AtomicOrdering::Relaxed) >= L1_CAPACITY {
             return;
         }
-        let key = decision_key(domain, group_id);
         let value = (encode_source(source), coarse_now_secs());
         match self.inner.entry(key) {
             dashmap::Entry::Vacant(e) => {
