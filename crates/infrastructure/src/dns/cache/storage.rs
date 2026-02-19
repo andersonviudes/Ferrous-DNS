@@ -123,7 +123,7 @@ impl DnsCache {
         if let Some(entry) = self.cache.get(&key) {
             let record = entry.value();
 
-            // Compute Instant::now() once and reuse for both expiry checks to
+            // Compute Instant::now() once and reuse for all time-based checks to
             // avoid multiple VDSO calls (~20–30 ns each) in the hot path.
             let now = std::time::Instant::now();
 
@@ -131,7 +131,7 @@ impl DnsCache {
                 record.refreshing.swap(true, AtomicOrdering::Acquire);
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
-                self.promote_to_l1(domain, record_type, record);
+                self.promote_to_l1(domain, record_type, record, now);
                 return Some((record.data.clone(), Some(record.dnssec_status)));
             }
 
@@ -144,7 +144,7 @@ impl DnsCache {
 
             self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
             record.record_hit();
-            self.promote_to_l1(domain, record_type, record);
+            self.promote_to_l1(domain, record_type, record, now);
             return Some((record.data.clone(), Some(record.dnssec_status)));
         }
 
@@ -269,12 +269,24 @@ impl DnsCache {
         self.eviction_strategy
     }
 
-    fn promote_to_l1(&self, domain: &str, record_type: &RecordType, record: &CachedRecord) {
+    fn promote_to_l1(
+        &self,
+        domain: &str,
+        record_type: &RecordType,
+        record: &CachedRecord,
+        now: std::time::Instant,
+    ) {
         if let CachedData::IpAddresses(ref addresses) = record.data {
-            // promote_to_l1 is only called after an L1 miss, so the l1_get()
-            // existence check here would always return None — skip it and
-            // insert directly (l1_insert is idempotent).
-            l1_insert(domain, record_type, Arc::clone(addresses), record.ttl);
+            // Use the remaining TTL (expires_at − now) rather than the original
+            // TTL so that L1 never serves a record past its L2 expiry.
+            // Example: TTL=300, promoted at T=150 → remaining=150, not 300.
+            let remaining_secs = if record.expires_at > now {
+                record.expires_at.duration_since(now).as_secs() as u32
+            } else {
+                return; // already expired, skip promotion
+            };
+
+            l1_insert(domain, record_type, Arc::clone(addresses), remaining_secs);
         }
     }
 
