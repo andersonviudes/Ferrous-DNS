@@ -107,16 +107,16 @@ impl DnsCache {
         &self,
         domain: &str,
         record_type: &RecordType,
-    ) -> Option<(CachedData, Option<DnssecStatus>)> {
+    ) -> Option<(CachedData, Option<DnssecStatus>, Option<u32>)> {
         let borrowed = BorrowedKey::new(domain, *record_type);
         if !self.bloom.check(&borrowed) {
             self.metrics.misses.fetch_add(1, AtomicOrdering::Relaxed);
             return None;
         }
 
-        if let Some(arc_data) = l1_get(domain, record_type) {
+        if let Some((arc_data, remaining_ttl)) = l1_get(domain, record_type) {
             self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
-            return Some((CachedData::IpAddresses(arc_data), None));
+            return Some((CachedData::IpAddresses(arc_data), None, Some(remaining_ttl)));
         }
 
         let key = CacheKey::new(domain, *record_type);
@@ -132,7 +132,8 @@ impl DnsCache {
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
                 self.promote_to_l1(domain, record_type, record, now);
-                return Some((record.data.clone(), Some(record.dnssec_status)));
+                // Stale-but-usable: TTL already past, report 0 to the caller.
+                return Some((record.data.clone(), Some(record.dnssec_status), Some(0)));
             }
 
             if record.is_expired_at(now) {
@@ -144,8 +145,12 @@ impl DnsCache {
 
             self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
             record.record_hit();
+            // Compute remaining TTL from the absolute expiry timestamp already
+            // stored in the record — no extra Instant::now() call needed here
+            // since `now` was already computed above.
+            let remaining_ttl = record.expires_at.duration_since(now).as_secs() as u32;
             self.promote_to_l1(domain, record_type, record, now);
-            return Some((record.data.clone(), Some(record.dnssec_status)));
+            return Some((record.data.clone(), Some(record.dnssec_status), Some(remaining_ttl)));
         }
 
         self.metrics.misses.fetch_add(1, AtomicOrdering::Relaxed);
