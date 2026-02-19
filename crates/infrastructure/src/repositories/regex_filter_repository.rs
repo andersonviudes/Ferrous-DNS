@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ferrous_dns_application::ports::RegexFilterRepository;
 use ferrous_dns_domain::{DomainAction, DomainError, RegexFilter};
-use regex::Regex;
+use fancy_regex::Regex;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tracing::{error, instrument};

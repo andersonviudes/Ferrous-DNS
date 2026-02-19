@@ -4,7 +4,7 @@ use aho_corasick::AhoCorasick;
 use compact_str::CompactString;
 use dashmap::{DashMap, DashSet};
 use ferrous_dns_domain::BlockSource;
-use regex::Regex;
+use fancy_regex::Regex;
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -110,7 +110,7 @@ impl BlockIndex {
         // Allow regex rules (user-defined, group-scoped)
         if let Some(regexes) = self.allow_regex_patterns.get(&group_id) {
             for r in regexes {
-                if r.is_match(domain) {
+                if r.is_match(domain).unwrap_or(false) {
                     return None;
                 }
             }
@@ -133,7 +133,7 @@ impl BlockIndex {
         // Block regex rules (user-defined, group-scoped)
         if let Some(regexes) = self.block_regex_patterns.get(&group_id) {
             for r in regexes {
-                if r.is_match(domain) {
+                if r.is_match(domain).unwrap_or(false) {
                     return Some(BlockSource::RegexFilter);
                 }
             }

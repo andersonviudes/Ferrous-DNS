@@ -6,7 +6,7 @@ use compact_str::CompactString;
 use dashmap::{DashMap, DashSet};
 use ferrous_dns_domain::DomainError;
 use futures::future::join_all;
-use regex::{Regex, RegexBuilder};
+use fancy_regex::Regex;
 use rustc_hash::FxBuildHasher;
 use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;
@@ -383,9 +383,7 @@ async fn load_regex_filters_for_index(pool: &SqlitePool) -> Result<RegexFilterMa
         let action: String = row.get("action");
         let group_id: i64 = row.get("group_id");
 
-        match RegexBuilder::new(&pattern)
-            .case_insensitive(true)
-            .build()
+        match Regex::new(&format!("(?i){}", &pattern))
         {
             Ok(re) => {
                 if action == "deny" {
