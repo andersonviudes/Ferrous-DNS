@@ -1,10 +1,16 @@
+use super::super::cache::key::CacheKey;
 use super::super::cache::{CachedData, DnsCache, DnssecStatus, NegativeQueryTracker};
 use super::super::prefetch::PrefetchPredictor;
 use async_trait::async_trait;
+use dashmap::DashMap;
 use ferrous_dns_application::ports::{DnsResolution, DnsResolver};
 use ferrous_dns_domain::{DnsQuery, DomainError};
+use rustc_hash::FxBuildHasher;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tokio::sync::watch;
+use tracing::debug;
+
+type InflightSender = Arc<watch::Sender<Option<Arc<DnsResolution>>>>;
 
 pub struct CachedResolver {
     inner: Arc<dyn DnsResolver>,
@@ -12,6 +18,7 @@ pub struct CachedResolver {
     cache_ttl: u32,
     negative_ttl_tracker: Arc<NegativeQueryTracker>,
     prefetch_predictor: Option<Arc<PrefetchPredictor>>,
+    inflight: Arc<DashMap<CacheKey, InflightSender, FxBuildHasher>>,
 }
 
 impl CachedResolver {
@@ -22,6 +29,7 @@ impl CachedResolver {
             cache_ttl,
             negative_ttl_tracker: Arc::new(NegativeQueryTracker::new()),
             prefetch_predictor: None,
+            inflight: Arc::new(DashMap::with_hasher(FxBuildHasher)),
         }
     }
 
@@ -40,8 +48,6 @@ impl CachedResolver {
                 );
 
                 let dnssec_str = dnssec_status.map(|s| s.as_str());
-                // remaining_ttl is now returned inline by cache.get() —
-                // no second DashMap lookup needed.
 
                 match data {
                     CachedData::IpAddresses(addrs) => DnsResolution {
@@ -121,18 +127,72 @@ impl DnsResolver for CachedResolver {
             return Ok(cached);
         }
 
+        let key = CacheKey::new(Arc::clone(&query.domain), query.record_type);
+
+        let (is_leader, mut rx) = match self.inflight.entry(key.clone()) {
+            dashmap::Entry::Occupied(e) => {
+                let rx = e.get().subscribe();
+                drop(e);
+                (false, rx)
+            }
+            dashmap::Entry::Vacant(e) => {
+                let (tx, rx) = watch::channel(None::<Arc<DnsResolution>>);
+                e.insert(Arc::new(tx));
+                (true, rx)
+            }
+        };
+
+        if !is_leader {
+            match rx.changed().await {
+                Ok(()) => {
+                    if let Some(arc_res) = rx.borrow().clone() {
+                        let mut res = (*arc_res).clone();
+                        res.cache_hit = true;
+                        return Ok(res);
+                    }
+                }
+                Err(_) => {
+                    if let Some(cached) = self.check_cache(query) {
+                        return if cached.addresses.is_empty() {
+                            Err(DomainError::NxDomain)
+                        } else {
+                            Ok(cached)
+                        };
+                    }
+                    return match self.inner.resolve(query).await {
+                        Ok(r) => {
+                            self.store_in_cache(query, &r);
+                            Ok(r)
+                        }
+                        Err(e) => Err(e),
+                    };
+                }
+            }
+            return match self.inner.resolve(query).await {
+                Ok(r) => {
+                    self.store_in_cache(query, &r);
+                    Ok(r)
+                }
+                Err(e) => Err(e),
+            };
+        }
+
         debug!(
             domain = %query.domain,
             record_type = %query.record_type,
             "Cache MISS"
         );
 
-        match self.inner.resolve(query).await {
+        let result = self.inner.resolve(query).await;
+
+        match &result {
             Ok(resolution) => {
-                self.store_in_cache(query, &resolution);
-                Ok(resolution)
+                self.store_in_cache(query, resolution);
+                if let Some((_, tx)) = self.inflight.remove(&key) {
+                    let _ = tx.send(Some(Arc::new(resolution.clone())));
+                }
             }
-            Err(e) => {
+            Err(_) => {
                 let dynamic_ttl = self.negative_ttl_tracker.record_and_get_ttl(&query.domain);
                 self.cache.insert(
                     query.domain.as_ref(),
@@ -141,15 +201,10 @@ impl DnsResolver for CachedResolver {
                     dynamic_ttl,
                     Some(DnssecStatus::Insecure),
                 );
-
-                warn!(
-                    domain = %query.domain,
-                    error = %e,
-                    "Query failed, caching negative response"
-                );
-
-                Err(e)
+                self.inflight.remove(&key);
             }
         }
+
+        result
     }
 }
