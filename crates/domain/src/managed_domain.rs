@@ -15,12 +15,16 @@ impl DomainAction {
             DomainAction::Deny => "deny",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for DomainAction {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "allow" => Some(DomainAction::Allow),
-            "deny" => Some(DomainAction::Deny),
-            _ => None,
+            "allow" => Ok(DomainAction::Allow),
+            "deny" => Ok(DomainAction::Deny),
+            _ => Err(()),
         }
     }
 }
@@ -82,9 +86,7 @@ impl ManagedDomain {
         // If domain contains '*', it must be exactly the "*.suffix" prefix form.
         // Reject "*x.com", "x.*.com", "x.com*", etc.
         if domain.contains('*') && !domain.starts_with("*.") {
-            return Err(
-                "Wildcard must be a prefix: use '*.example.com' format".to_string(),
-            );
+            return Err("Wildcard must be a prefix: use '*.example.com' format".to_string());
         }
 
         let check = if let Some(rest) = domain.strip_prefix("*.") {

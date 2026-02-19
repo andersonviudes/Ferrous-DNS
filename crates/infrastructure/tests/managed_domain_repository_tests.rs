@@ -227,7 +227,15 @@ async fn test_update_name() {
 
     let id = created.id.unwrap();
     let updated = repo
-        .update(id, Some("New Name".to_string()), None, None, None, None, None)
+        .update(
+            id,
+            Some("New Name".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .await
         .unwrap();
 
@@ -254,15 +262,7 @@ async fn test_update_action() {
 
     let id = created.id.unwrap();
     let updated = repo
-        .update(
-            id,
-            None,
-            None,
-            Some(DomainAction::Allow),
-            None,
-            None,
-            None,
-        )
+        .update(id, None, None, Some(DomainAction::Allow), None, None, None)
         .await
         .unwrap();
 
@@ -301,7 +301,15 @@ async fn test_update_not_found() {
     let repo = SqliteManagedDomainRepository::new(pool);
 
     let result = repo
-        .update(999, Some("New Name".to_string()), None, None, None, None, None)
+        .update(
+            999,
+            Some("New Name".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .await;
 
     assert!(result.is_err());

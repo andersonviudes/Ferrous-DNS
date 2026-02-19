@@ -1385,9 +1385,7 @@ impl BlockFilterEnginePort for MockBlockFilterEngine {
 
     async fn reload(&self) -> Result<(), DomainError> {
         if *self.should_fail_reload.read().await {
-            return Err(DomainError::DatabaseError(
-                "Mock reload failed".to_string(),
-            ));
+            return Err(DomainError::DatabaseError("Mock reload failed".to_string()));
         }
         *self.reload_count.write().await += 1;
         Ok(())

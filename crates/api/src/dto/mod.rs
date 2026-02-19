@@ -8,12 +8,12 @@ pub mod config;
 pub mod group;
 pub mod hostname;
 pub mod local_record;
+pub mod managed_domain;
 pub mod query;
 pub mod rate;
 pub mod stats;
 pub mod timeline;
 pub mod whitelist;
-pub mod managed_domain;
 pub mod whitelist_source;
 
 pub use local_record::{CreateLocalRecordRequest, LocalRecordDto};

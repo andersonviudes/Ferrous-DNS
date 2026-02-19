@@ -6,7 +6,17 @@ use std::sync::Arc;
 use tracing::{error, instrument};
 
 // (id, name, domain, action, group_id, comment, enabled, created_at, updated_at)
-type ManagedDomainRow = (i64, String, String, String, i64, Option<String>, i64, String, String);
+type ManagedDomainRow = (
+    i64,
+    String,
+    String,
+    String,
+    i64,
+    Option<String>,
+    i64,
+    String,
+    String,
+);
 
 pub struct SqliteManagedDomainRepository {
     pool: SqlitePool,
@@ -23,7 +33,7 @@ impl SqliteManagedDomainRepository {
             id: Some(id),
             name: Arc::from(name.as_str()),
             domain: Arc::from(domain.as_str()),
-            action: DomainAction::from_str(&action).unwrap_or(DomainAction::Deny),
+            action: action.parse::<DomainAction>().unwrap_or(DomainAction::Deny),
             group_id,
             comment: comment.map(|s| Arc::from(s.as_str())),
             enabled: enabled != 0,

@@ -1,4 +1,5 @@
 use ferrous_dns_domain::{DomainAction, ManagedDomain};
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[test]
@@ -150,19 +151,25 @@ fn test_validate_comment_exactly_500_chars() {
 
 #[test]
 fn test_domain_action_from_str_allow() {
-    assert_eq!(DomainAction::from_str("allow"), Some(DomainAction::Allow));
+    assert_eq!(
+        DomainAction::from_str("allow").ok(),
+        Some(DomainAction::Allow)
+    );
 }
 
 #[test]
 fn test_domain_action_from_str_deny() {
-    assert_eq!(DomainAction::from_str("deny"), Some(DomainAction::Deny));
+    assert_eq!(
+        DomainAction::from_str("deny").ok(),
+        Some(DomainAction::Deny)
+    );
 }
 
 #[test]
 fn test_domain_action_from_str_invalid() {
-    assert_eq!(DomainAction::from_str("block"), None);
-    assert_eq!(DomainAction::from_str(""), None);
-    assert_eq!(DomainAction::from_str("ALLOW"), None);
+    assert!(DomainAction::from_str("block").is_err());
+    assert!(DomainAction::from_str("").is_err());
+    assert!(DomainAction::from_str("ALLOW").is_err());
 }
 
 #[test]

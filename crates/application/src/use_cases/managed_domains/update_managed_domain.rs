@@ -24,6 +24,7 @@ impl UpdateManagedDomainUseCase {
     }
 
     #[instrument(skip(self))]
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute(
         &self,
         id: i64,

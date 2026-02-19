@@ -242,12 +242,11 @@ struct ManagedDomainEntry {
 async fn load_managed_domains_for_index(
     pool: &SqlitePool,
 ) -> Result<Vec<ManagedDomainEntry>, DomainError> {
-    let rows = sqlx::query(
-        "SELECT domain, action, group_id FROM managed_domains WHERE enabled = 1",
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(|e| DomainError::DatabaseError(e.to_string()))?;
+    let rows =
+        sqlx::query("SELECT domain, action, group_id FROM managed_domains WHERE enabled = 1")
+            .fetch_all(pool)
+            .await
+            .map_err(|e| DomainError::DatabaseError(e.to_string()))?;
 
     let entries: Vec<ManagedDomainEntry> = rows
         .iter()

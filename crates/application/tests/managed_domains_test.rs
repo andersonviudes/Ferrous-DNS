@@ -1,3 +1,4 @@
+use ferrous_dns_application::ports::ManagedDomainRepository;
 use ferrous_dns_application::use_cases::managed_domains::{
     CreateManagedDomainUseCase, DeleteManagedDomainUseCase, GetManagedDomainsUseCase,
     UpdateManagedDomainUseCase,
@@ -95,8 +96,7 @@ async fn test_create_deny_success() {
     let repo = Arc::new(MockManagedDomainRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let engine = Arc::new(MockBlockFilterEngine::new());
-    let use_case =
-        CreateManagedDomainUseCase::new(repo.clone(), group_repo, engine.clone());
+    let use_case = CreateManagedDomainUseCase::new(repo.clone(), group_repo, engine.clone());
 
     let result = use_case
         .execute(
@@ -373,15 +373,7 @@ async fn test_update_invalid_group() {
         .unwrap();
 
     let result = update_uc
-        .execute(
-            created.id.unwrap(),
-            None,
-            None,
-            None,
-            Some(999),
-            None,
-            None,
-        )
+        .execute(created.id.unwrap(), None, None, None, Some(999), None, None)
         .await;
 
     assert!(result.is_err());
@@ -398,8 +390,7 @@ async fn test_delete_success() {
     let repo = Arc::new(MockManagedDomainRepository::new());
     let group_repo = Arc::new(MockGroupRepository::new());
     let engine = Arc::new(MockBlockFilterEngine::new());
-    let create_uc =
-        CreateManagedDomainUseCase::new(repo.clone(), group_repo, engine.clone());
+    let create_uc = CreateManagedDomainUseCase::new(repo.clone(), group_repo, engine.clone());
     let delete_uc = DeleteManagedDomainUseCase::new(repo.clone(), engine.clone());
 
     let created = create_uc

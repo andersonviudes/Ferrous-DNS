@@ -45,7 +45,14 @@ impl CreateManagedDomainUseCase {
 
         let managed_domain = self
             .repo
-            .create(name.clone(), domain.clone(), action, group_id, comment, enabled)
+            .create(
+                name.clone(),
+                domain.clone(),
+                action,
+                group_id,
+                comment,
+                enabled,
+            )
             .await?;
 
         info!(

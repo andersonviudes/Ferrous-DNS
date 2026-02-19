@@ -3,7 +3,7 @@ use ferrous_dns_application::services::SubnetMatcherService;
 use ferrous_dns_application::use_cases::{
     AssignClientGroupUseCase, CleanupOldClientsUseCase, CleanupOldQueryLogsUseCase,
     CreateBlocklistSourceUseCase, CreateClientSubnetUseCase, CreateGroupUseCase,
-    CreateManualClientUseCase, CreateManagedDomainUseCase, CreateWhitelistSourceUseCase,
+    CreateManagedDomainUseCase, CreateManualClientUseCase, CreateWhitelistSourceUseCase,
     DeleteBlocklistSourceUseCase, DeleteClientSubnetUseCase, DeleteClientUseCase,
     DeleteGroupUseCase, DeleteManagedDomainUseCase, DeleteWhitelistSourceUseCase,
     GetBlockFilterStatsUseCase, GetBlocklistSourcesUseCase, GetBlocklistUseCase,

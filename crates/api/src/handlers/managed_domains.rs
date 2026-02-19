@@ -27,7 +27,10 @@ async fn get_all_managed_domains(
 ) -> Json<Vec<ManagedDomainResponse>> {
     match state.get_managed_domains.get_all().await {
         Ok(domains) => {
-            debug!(count = domains.len(), "Managed domains retrieved successfully");
+            debug!(
+                count = domains.len(),
+                "Managed domains retrieved successfully"
+            );
             Json(
                 domains
                     .into_iter()
@@ -63,7 +66,7 @@ async fn create_managed_domain(
     State(state): State<AppState>,
     Json(req): Json<CreateManagedDomainRequest>,
 ) -> Result<(StatusCode, Json<ManagedDomainResponse>), (StatusCode, String)> {
-    let action = DomainAction::from_str(&req.action).ok_or_else(|| {
+    let action = req.action.parse::<DomainAction>().ok().ok_or_else(|| {
         (
             StatusCode::BAD_REQUEST,
             format!("Invalid action '{}': must be 'allow' or 'deny'", req.action),
@@ -97,14 +100,12 @@ async fn update_managed_domain(
     Json(req): Json<UpdateManagedDomainRequest>,
 ) -> Result<Json<ManagedDomainResponse>, (StatusCode, String)> {
     let action = match req.action {
-        Some(ref s) => {
-            Some(DomainAction::from_str(s).ok_or_else(|| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    format!("Invalid action '{}': must be 'allow' or 'deny'", s),
-                )
-            })?)
-        }
+        Some(ref s) => Some(s.parse::<DomainAction>().ok().ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid action '{}': must be 'allow' or 'deny'", s),
+            )
+        })?),
         None => None,
     };
 
