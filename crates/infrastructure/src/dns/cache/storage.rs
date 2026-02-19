@@ -337,10 +337,7 @@ impl DnsCache {
             EvictionStrategy::LFUK => {
                 let access_time = record.last_access.load(AtomicOrdering::Relaxed) as f64;
                 let hits = record.hit_count.load(AtomicOrdering::Relaxed) as f64;
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as f64;
+                let now = super::coarse_clock::coarse_now_secs() as f64;
                 let inserted_unix = record.inserted_at.elapsed().as_secs() as f64;
                 let age = now - inserted_unix;
                 let k_value = 0.5;

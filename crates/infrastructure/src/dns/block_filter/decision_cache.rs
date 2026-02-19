@@ -1,15 +1,22 @@
-use compact_str::CompactString;
 use dashmap::DashMap;
 use lru::LruCache;
-use rustc_hash::FxBuildHasher;
+use rustc_hash::{FxBuildHasher, FxHasher};
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
 const TTL: Duration = Duration::from_secs(60);
 const L0_CAPACITY: usize = 256;
 
-type BlockL0Cache = LruCache<(CompactString, i64), (bool, Instant), FxBuildHasher>;
+fn decision_key(domain: &str, group_id: i64) -> u64 {
+    let mut h = FxHasher::default();
+    domain.hash(&mut h);
+    group_id.hash(&mut h);
+    h.finish()
+}
+
+type BlockL0Cache = LruCache<u64, (bool, Instant), FxBuildHasher>;
 
 thread_local! {
     static BLOCK_L0: RefCell<BlockL0Cache> =
@@ -23,7 +30,7 @@ thread_local! {
 pub fn decision_l0_get(domain: &str, group_id: i64) -> Option<bool> {
     BLOCK_L0.with(|c| {
         let mut c = c.borrow_mut();
-        let key = (CompactString::new(domain), group_id);
+        let key = decision_key(domain, group_id);
         if let Some((blocked, inserted_at)) = c.get(&key) {
             if inserted_at.elapsed() < TTL {
                 return Some(*blocked);
@@ -37,10 +44,8 @@ pub fn decision_l0_get(domain: &str, group_id: i64) -> Option<bool> {
 #[inline]
 pub fn decision_l0_set(domain: &str, group_id: i64, blocked: bool) {
     BLOCK_L0.with(|c| {
-        c.borrow_mut().put(
-            (CompactString::new(domain), group_id),
-            (blocked, Instant::now()),
-        );
+        c.borrow_mut()
+            .put(decision_key(domain, group_id), (blocked, Instant::now()));
     });
 }
 
@@ -49,7 +54,7 @@ pub fn decision_l0_clear() {
 }
 
 pub struct BlockDecisionCache {
-    inner: DashMap<(CompactString, i64), (bool, Instant), FxBuildHasher>,
+    inner: DashMap<u64, (bool, Instant), FxBuildHasher>,
 }
 
 impl BlockDecisionCache {
@@ -61,7 +66,7 @@ impl BlockDecisionCache {
 
     #[inline]
     pub fn get(&self, domain: &str, group_id: i64) -> Option<bool> {
-        let key = (CompactString::new(domain), group_id);
+        let key = decision_key(domain, group_id);
         if let Some(entry) = self.inner.get(&key) {
             let (blocked, inserted_at) = *entry;
             if inserted_at.elapsed() < TTL {
@@ -75,10 +80,8 @@ impl BlockDecisionCache {
 
     #[inline]
     pub fn set(&self, domain: &str, group_id: i64, blocked: bool) {
-        self.inner.insert(
-            (CompactString::new(domain), group_id),
-            (blocked, Instant::now()),
-        );
+        self.inner
+            .insert(decision_key(domain, group_id), (blocked, Instant::now()));
     }
 
     pub fn clear(&self) {
