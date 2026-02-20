@@ -251,16 +251,16 @@ impl ChainVerifier {
             );
         }
 
-        // When RRSIG(DNSKEY) was verified, all keys in the response are authenticated
-        // (KSK + ZSK). Store all of them so ZSKs can be used to verify the final RRset.
-        // When RRSIG was skipped (cache hit), store only DS-matched keys.
-        let keys_to_store = if rrsig_ok {
-            dnskey_result.keys
-        } else {
-            validated_keys
-        };
+        // Always store all DNSKEY records (KSK + ZSK) for this zone.
+        //
+        // On a cache hit rrsig_ok is false because there is no RRSIG to re-verify,
+        // but the cached keys were authenticated (DS → KSK → RRSIG(DNSKEY) → ZSK)
+        // when they were first fetched.  Storing only the DS-matched KSK would drop
+        // the ZSK, and data-record RRSIGs (A, AAAA, CNAME …) are signed by the ZSK,
+        // not the KSK.  That would make every phase-2 key_tag lookup fail and force
+        // the result to Bogus on every DNSKEY cache hit.
         self.validated_keys
-            .insert(child_domain.to_string(), keys_to_store);
+            .insert(child_domain.to_string(), dnskey_result.keys);
 
         Ok(())
     }
