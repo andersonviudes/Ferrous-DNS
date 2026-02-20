@@ -598,8 +598,10 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         let total_hits = row.get::<i64, _>("hits") as u64;
         let total_misses = row.get::<i64, _>("misses") as u64;
         let total_refreshes = row.get::<i64, _>("refreshes") as u64;
-        let total_queries = total_hits + total_misses;
+        let total_queries = row.get::<i64, _>("total_queries") as u64;
 
+        // Use total client queries as denominator (same population as the Query Source chart)
+        // so both metrics are directly comparable.
         let hit_rate = if total_queries > 0 {
             (total_hits as f64 / total_queries as f64) * 100.0
         } else {
