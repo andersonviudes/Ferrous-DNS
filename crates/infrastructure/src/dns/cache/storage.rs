@@ -170,6 +170,11 @@ impl DnsCache {
     ) {
         let key = CacheKey::new(domain, record_type);
 
+        // NOTE: len() check is not atomic with the subsequent insert.
+        // Under high concurrency the cache may transiently exceed max_entries
+        // by up to (num_concurrent_writers × batch_eviction_percentage) entries.
+        // This overshoot is bounded and self-corrected on the next insertion.
+        // Intentional trade-off: avoiding a global lock preserves throughput.
         if self.cache.len() >= self.max_entries {
             self.evict_entries();
         }
