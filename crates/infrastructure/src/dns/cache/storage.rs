@@ -112,7 +112,7 @@ impl DnsCache {
             return Some((CachedData::IpAddresses(arc_data), None, Some(remaining_ttl)));
         }
 
-        let key = CacheKey::new(Arc::clone(domain), *record_type);
+        let key = CacheKey::new(domain.as_ref(), *record_type);
         if let Some(entry) = self.cache.get(&key) {
             let record = entry.value();
 

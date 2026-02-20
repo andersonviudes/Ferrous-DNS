@@ -2,14 +2,8 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
-/// Each word occupies its own cache line (64 bytes) so that concurrent reads
-/// from different threads never invalidate each other's cache lines (false sharing).
-/// Trade-off: 8× more memory per bloom filter — acceptable at ~400 KB for 200 K entries.
-#[repr(align(64))]
-struct CacheAligned(AtomicU64);
-
 pub struct AtomicBloom {
-    bits: Vec<CacheAligned>,
+    bits: Vec<AtomicU64>,
     mask: u64,
     num_hashes: usize,
 }
@@ -20,7 +14,7 @@ impl AtomicBloom {
         let num_hashes = Self::optimal_num_hashes(capacity, num_bits);
         let num_words = num_bits.div_ceil(64);
         let bits = (0..num_words)
-            .map(|_| CacheAligned(AtomicU64::new(0)))
+            .map(|_| AtomicU64::new(0))
             .collect();
         Self {
             bits,
@@ -37,33 +31,33 @@ impl AtomicBloom {
 
         if num_hashes == 5 {
             let idx0 = Self::nth_hash(h1, h2, 0, mask);
-            if self.bits[idx0 / 64].0.load(AtomicOrdering::Relaxed) & (1u64 << (idx0 % 64)) == 0 {
+            if self.bits[idx0 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx0 % 64)) == 0 {
                 return false;
             }
 
             let idx1 = Self::nth_hash(h1, h2, 1, mask);
-            if self.bits[idx1 / 64].0.load(AtomicOrdering::Relaxed) & (1u64 << (idx1 % 64)) == 0 {
+            if self.bits[idx1 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx1 % 64)) == 0 {
                 return false;
             }
 
             let idx2 = Self::nth_hash(h1, h2, 2, mask);
-            if self.bits[idx2 / 64].0.load(AtomicOrdering::Relaxed) & (1u64 << (idx2 % 64)) == 0 {
+            if self.bits[idx2 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx2 % 64)) == 0 {
                 return false;
             }
 
             let idx3 = Self::nth_hash(h1, h2, 3, mask);
-            if self.bits[idx3 / 64].0.load(AtomicOrdering::Relaxed) & (1u64 << (idx3 % 64)) == 0 {
+            if self.bits[idx3 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx3 % 64)) == 0 {
                 return false;
             }
 
             let idx4 = Self::nth_hash(h1, h2, 4, mask);
-            self.bits[idx4 / 64].0.load(AtomicOrdering::Relaxed) & (1u64 << (idx4 % 64)) != 0
+            self.bits[idx4 / 64].load(AtomicOrdering::Relaxed) & (1u64 << (idx4 % 64)) != 0
         } else {
             for i in 0..num_hashes {
                 let bit_idx = Self::nth_hash(h1, h2, i as u64, mask);
                 let word_idx = bit_idx / 64;
                 let bit_pos = bit_idx % 64;
-                if (self.bits[word_idx].0.load(AtomicOrdering::Relaxed) & (1u64 << bit_pos)) == 0 {
+                if (self.bits[word_idx].load(AtomicOrdering::Relaxed) & (1u64 << bit_pos)) == 0 {
                     return false;
                 }
             }
@@ -80,27 +74,22 @@ impl AtomicBloom {
         if num_hashes == 5 {
             let idx0 = Self::nth_hash(h1, h2, 0, mask);
             self.bits[idx0 / 64]
-                .0
                 .fetch_or(1u64 << (idx0 % 64), AtomicOrdering::Relaxed);
 
             let idx1 = Self::nth_hash(h1, h2, 1, mask);
             self.bits[idx1 / 64]
-                .0
                 .fetch_or(1u64 << (idx1 % 64), AtomicOrdering::Relaxed);
 
             let idx2 = Self::nth_hash(h1, h2, 2, mask);
             self.bits[idx2 / 64]
-                .0
                 .fetch_or(1u64 << (idx2 % 64), AtomicOrdering::Relaxed);
 
             let idx3 = Self::nth_hash(h1, h2, 3, mask);
             self.bits[idx3 / 64]
-                .0
                 .fetch_or(1u64 << (idx3 % 64), AtomicOrdering::Relaxed);
 
             let idx4 = Self::nth_hash(h1, h2, 4, mask);
             self.bits[idx4 / 64]
-                .0
                 .fetch_or(1u64 << (idx4 % 64), AtomicOrdering::Relaxed);
         } else {
             for i in 0..num_hashes {
@@ -108,7 +97,6 @@ impl AtomicBloom {
                 let word_idx = bit_idx / 64;
                 let bit_pos = bit_idx % 64;
                 self.bits[word_idx]
-                    .0
                     .fetch_or(1u64 << bit_pos, AtomicOrdering::Relaxed);
             }
         }
@@ -116,7 +104,7 @@ impl AtomicBloom {
 
     pub fn clear(&self) {
         for word in &self.bits {
-            word.0.store(0, AtomicOrdering::Relaxed);
+            word.store(0, AtomicOrdering::Relaxed);
         }
     }
 

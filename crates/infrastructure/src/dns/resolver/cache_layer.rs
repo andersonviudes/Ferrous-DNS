@@ -130,7 +130,7 @@ impl DnsResolver for CachedResolver {
             return Ok(cached);
         }
 
-        let key = CacheKey::new(Arc::clone(&query.domain), query.record_type);
+        let key = CacheKey::new(query.domain.as_ref(), query.record_type);
 
         let (is_leader, mut rx) = match self.inflight.entry(key.clone()) {
             dashmap::Entry::Occupied(e) => {
