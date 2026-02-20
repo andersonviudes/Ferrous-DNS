@@ -149,9 +149,15 @@ impl DnsResolver for CachedResolver {
             match rx.changed().await {
                 Ok(()) => {
                     if let Some(arc_res) = rx.borrow().clone() {
-                        let mut res = (*arc_res).clone();
-                        res.cache_hit = true;
-                        return Ok(res);
+                        return Ok(DnsResolution {
+                            addresses: Arc::clone(&arc_res.addresses),
+                            cache_hit: true,
+                            dnssec_status: arc_res.dnssec_status,
+                            cname: None,
+                            upstream_server: None,
+                            min_ttl: arc_res.min_ttl,
+                            authority_records: vec![],
+                        });
                     }
                 }
                 Err(_) => {
