@@ -34,8 +34,17 @@ impl SignatureVerifier {
             return Ok(false);
         }
 
+        // Name::from_str treats strings without a trailing dot as relative names,
+        // which omit the root label (0x00) from the wire format.  DNSSEC signatures
+        // are always computed over absolute (FQDN) names.  Append a trailing dot if
+        // the caller omitted it so TBS construction uses the correct wire encoding.
+        let fqdn = if domain.ends_with('.') {
+            domain.to_owned()
+        } else {
+            format!("{}.", domain)
+        };
         let name =
-            Name::from_str(domain).map_err(|e| DomainError::InvalidDnsResponse(e.to_string()))?;
+            Name::from_str(&fqdn).map_err(|e| DomainError::InvalidDnsResponse(e.to_string()))?;
         let signer_name = Name::from_str(&rrsig.signer_name)
             .map_err(|e| DomainError::InvalidDnsResponse(e.to_string()))?;
         let hickory_type = RecordTypeMapper::to_hickory(&rrsig.type_covered);
