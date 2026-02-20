@@ -244,13 +244,6 @@
             <a href="/settings.html" class="nav-item active"><i data-lucide="settings" class="nav-icon"></i><span>Settings</span></a>
         </div>
     </nav>
-    <div class="sidebar-footer">
-        <button @click="toggleTheme()" class="theme-btn">
-            <i data-lucide="sun" x-show="theme==='light'" style="width:16px;height:16px"></i>
-            <i data-lucide="moon" x-show="theme==='dark'" style="width:16px;height:16px"></i>
-            <span>Theme</span>
-        </button>
-    </div>
 </aside>
 
 <main style="padding:24px">
@@ -283,6 +276,8 @@
                 :class="currentTab==='dnsadvanced'?'tab-btn active':'tab-btn'">DNS Advanced</button>
         <button @click="currentTab='cache';scheduleLucide()"
                 :class="currentTab==='cache'?'tab-btn active':'tab-btn'">Cache Settings</button>
+        <button @click="currentTab='webinterface';scheduleLucide()"
+                :class="currentTab==='webinterface'?'tab-btn active':'tab-btn'">Web Interface</button>
     </div>
 
     <!-- DNS SETTINGS TAB -->
@@ -629,6 +624,30 @@
         <button @click="saveConfig()" class="btn btn-success">
             <i data-lucide="save" style="width:16px;height:16px"></i> Save Cache Settings
         </button>
+    </div>
+
+    <!-- WEB INTERFACE TAB -->
+    <div x-show="currentTab==='webinterface'&&!loading" x-cloak>
+        <div class="card">
+            <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary)">Appearance</h2>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px">Choose the color scheme for the web interface</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:480px">
+                <div @click="theme !== 'light' && toggleTheme()"
+                     :style="theme==='light' ? 'border:2px solid var(--color-primary)' : 'border:2px solid var(--border-color)'"
+                     style="padding:24px;border-radius:12px;cursor:pointer;text-align:center;transition:border-color 0.2s">
+                    <i data-lucide="sun" style="width:32px;height:32px;color:#F59E0B;margin-bottom:12px"></i>
+                    <p style="font-weight:600;color:var(--text-primary)">Light</p>
+                    <p x-show="theme==='light'" style="font-size:12px;color:var(--color-primary);margin-top:4px">Active</p>
+                </div>
+                <div @click="theme !== 'dark' && toggleTheme()"
+                     :style="theme==='dark' ? 'border:2px solid var(--color-primary)' : 'border:2px solid var(--border-color)'"
+                     style="padding:24px;border-radius:12px;cursor:pointer;text-align:center;transition:border-color 0.2s">
+                    <i data-lucide="moon" style="width:32px;height:32px;color:#6366F1;margin-bottom:12px"></i>
+                    <p style="font-weight:600;color:var(--text-primary)">Dark</p>
+                    <p x-show="theme==='dark'" style="font-size:12px;color:var(--color-primary);margin-top:4px">Active</p>
+                </div>
+            </div>
+        </div>
     </div>
 
 </main>
