@@ -658,21 +658,45 @@
                     </div>
                 </div>
 
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border-color)">
-                    <div style="flex:1;margin-right:32px">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                            <i data-lucide="filter" style="width:20px;height:20px;color:var(--color-primary)"></i>
-                            <h4 style="font-size:16px;font-weight:600;margin:0">Eviction Strategy</h4>
-                        </div>
-                        <p style="font-size:13px;color:var(--text-secondary);margin:0">Algorithm used to select which cache entries are removed when the cache reaches its size limit. <strong>Hit Rate</strong> keeps entries that are accessed most frequently relative to their TTL, providing the best overall effectiveness for a DNS cache.</p>
+                <div style="padding:16px 0;border-bottom:1px solid var(--border-color)">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <i data-lucide="filter" style="width:20px;height:20px;color:var(--color-primary)"></i>
+                        <h4 style="font-size:16px;font-weight:600;margin:0">Eviction Strategy</h4>
                     </div>
-                    <div style="flex-shrink:0;width:210px">
-                        <select x-model="config.dns.cache_eviction_strategy" style="width:100%">
-                            <option value="lru">LRU — Least Recently Used</option>
-                            <option value="lfu">LFU — Least Frequently Used</option>
-                            <option value="lfu-k">LFU-K — Adaptive</option>
-                            <option value="hit_rate">Hit Rate Based</option>
-                        </select>
+                    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px">Algorithm used to select which cache entries are removed when the cache reaches its size limit.</p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+                        <div :style="config.dns.cache_eviction_strategy==='lru'?'border:2px solid var(--color-primary);background:rgba(59,130,246,0.05)':'border:1px solid var(--border-color);background:var(--bg-tertiary)'"
+                             style="border-radius:8px;padding:14px;cursor:pointer" @click="config.dns.cache_eviction_strategy='lru'">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                                <i data-lucide="clock-3" style="width:16px;height:16px;color:#F59E0B"></i>
+                                <span style="font-size:13px;font-weight:600">LRU — Least Recently Used</span>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0">Removes the entry that was accessed least recently. Simple and predictable — entries not queried for a while are first to go. Well suited for workloads where recent access reliably predicts future demand.</p>
+                        </div>
+                        <div :style="config.dns.cache_eviction_strategy==='lfu'?'border:2px solid var(--color-primary);background:rgba(59,130,246,0.05)':'border:1px solid var(--border-color);background:var(--bg-tertiary)'"
+                             style="border-radius:8px;padding:14px;cursor:pointer" @click="config.dns.cache_eviction_strategy='lfu'">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                                <i data-lucide="bar-chart" style="width:16px;height:16px;color:#A855F7"></i>
+                                <span style="font-size:13px;font-weight:600">LFU — Least Frequently Used</span>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0">Removes entries with the lowest total hit count. Keeps the most-queried domains in cache indefinitely. May cause cache pollution where old popular entries crowd out newer, more relevant ones.</p>
+                        </div>
+                        <div :style="config.dns.cache_eviction_strategy==='lfu-k'?'border:2px solid var(--color-primary);background:rgba(59,130,246,0.05)':'border:1px solid var(--border-color);background:var(--bg-tertiary)'"
+                             style="border-radius:8px;padding:14px;cursor:pointer" @click="config.dns.cache_eviction_strategy='lfu-k'">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                                <i data-lucide="activity" style="width:16px;height:16px;color:#3B82F6"></i>
+                                <span style="font-size:13px;font-weight:600">LFU-K — Adaptive</span>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0">Uses the K most recent access timestamps to compute frequency, making it responsive to shifting access patterns. Balances LFU's popularity bias with LRU's recency awareness for adaptive workloads.</p>
+                        </div>
+                        <div :style="config.dns.cache_eviction_strategy==='hit_rate'?'border:2px solid var(--color-primary);background:rgba(59,130,246,0.05)':'border:1px solid var(--border-color);background:var(--bg-tertiary)'"
+                             style="border-radius:8px;padding:14px;cursor:pointer" @click="config.dns.cache_eviction_strategy='hit_rate'">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                                <i data-lucide="target" style="width:16px;height:16px;color:#10B981"></i>
+                                <span style="font-size:13px;font-weight:600">Hit Rate Based &nbsp;<span style="font-size:11px;color:#10B981;font-weight:500">(recommended)</span></span>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0">Scores entries by hits relative to their TTL. A frequently queried short-TTL record scores higher than one with equal hits but a longer TTL. Ideal for DNS — correctly values CDN and dynamic records that matter most.</p>
+                        </div>
                     </div>
                 </div>
 
