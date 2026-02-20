@@ -125,7 +125,6 @@ impl DnsCache {
                 record.refreshing.swap(true, AtomicOrdering::Acquire);
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
-                self.promote_to_l1(domain.as_ref(), record_type, record, now_secs);
                 return Some((record.data.clone(), Some(record.dnssec_status), Some(0)));
             }
 
@@ -161,7 +160,7 @@ impl DnsCache {
         ttl: u32,
         dnssec_status: Option<DnssecStatus>,
     ) {
-        let key = CacheKey::from_str(domain, record_type);
+        let key = CacheKey::new(domain, record_type);
 
         if self.cache.len() >= self.max_entries {
             self.evict_entries();
@@ -199,7 +198,7 @@ impl DnsCache {
         data: CachedData,
         _dnssec_status: Option<DnssecStatus>,
     ) {
-        let key = CacheKey::from_str(domain, record_type);
+        let key = CacheKey::new(domain, record_type);
         self.bloom.set(&key);
 
         if self.cache.len() >= self.max_entries {
@@ -220,7 +219,7 @@ impl DnsCache {
     }
 
     pub fn remove(&self, domain: &str, record_type: &RecordType) -> bool {
-        let key = CacheKey::from_str(domain, *record_type);
+        let key = CacheKey::new(domain, *record_type);
 
         if self.cache.remove(&key).is_some() {
             self.metrics.evictions.fetch_add(1, AtomicOrdering::Relaxed);
@@ -249,12 +248,12 @@ impl DnsCache {
     }
 
     pub fn get_ttl(&self, domain: &str, record_type: &RecordType) -> Option<u32> {
-        let key = CacheKey::from_str(domain, *record_type);
+        let key = CacheKey::new(domain, *record_type);
         self.cache.get(&key).map(|entry| entry.ttl)
     }
 
     pub fn get_remaining_ttl(&self, domain: &str, record_type: &RecordType) -> Option<u32> {
-        let key = CacheKey::from_str(domain, *record_type);
+        let key = CacheKey::new(domain, *record_type);
         self.cache
             .get(&key)
             .map(|entry| entry.expires_at_secs.saturating_sub(coarse_now_secs()) as u32)
@@ -278,7 +277,7 @@ impl DnsCache {
         new_data: CachedData,
         dnssec_status: Option<DnssecStatus>,
     ) -> bool {
-        let key = CacheKey::from_str(domain, *record_type);
+        let key = CacheKey::new(domain, *record_type);
         let now = coarse_now_secs();
 
         if let Some(mut entry) = self.cache.get_mut(&key) {

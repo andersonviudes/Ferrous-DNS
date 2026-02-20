@@ -80,6 +80,7 @@ impl CacheUpdater {
         resolver: &Arc<HickoryDnsResolver>,
         query_log: &Option<Arc<dyn QueryLogRepository>>,
     ) {
+        coarse_clock::tick();
         debug!("Starting cache update cycle");
 
         let candidates = cache.get_refresh_candidates();

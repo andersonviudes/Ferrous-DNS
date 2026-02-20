@@ -77,7 +77,7 @@ impl DnsCache {
     pub fn reset_refreshing(&self, domain: &str, record_type: &RecordType) {
         use super::key::CacheKey;
 
-        let key = CacheKey::from_str(domain, *record_type);
+        let key = CacheKey::new(domain, *record_type);
         if let Some(entry) = self.cache.get(&key) {
             entry.refreshing.store(false, AtomicOrdering::Release);
         }
