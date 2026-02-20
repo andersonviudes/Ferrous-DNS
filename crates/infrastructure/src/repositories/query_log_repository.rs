@@ -400,7 +400,11 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                 COUNT(DISTINCT client_ip) as unique_clients,
                 AVG(response_time_ms) as avg_time,
                 AVG(CASE WHEN cache_hit = 1 THEN response_time_ms END) as avg_cache_time,
-                AVG(CASE WHEN cache_hit = 0 AND blocked = 0 THEN response_time_ms END) as avg_upstream_time
+                AVG(CASE WHEN cache_hit = 0 AND blocked = 0 THEN response_time_ms END) as avg_upstream_time,
+                SUM(CASE WHEN cache_hit = 0 AND blocked = 0 THEN 1 ELSE 0 END) as upstream_count,
+                SUM(CASE WHEN blocked = 1 AND block_source = 'blocklist' THEN 1 ELSE 0 END) as blocklist_count,
+                SUM(CASE WHEN blocked = 1 AND block_source = 'managed_domain' THEN 1 ELSE 0 END) as managed_domain_count,
+                SUM(CASE WHEN blocked = 1 AND block_source = 'regex_filter' THEN 1 ELSE 0 END) as regex_filter_count
              FROM query_log
              WHERE response_time_ms IS NOT NULL
                AND created_at >= datetime('now', '-' || ? || ' hours')
@@ -458,6 +462,11 @@ impl QueryLogRepository for SqliteQueryLogRepository {
             avg_upstream_time_ms: row
                 .get::<Option<f64>, _>("avg_upstream_time")
                 .unwrap_or(0.0),
+            queries_cache_hits: cache_hits,
+            queries_upstream: row.get::<i64, _>("upstream_count") as u64,
+            queries_blocked_by_blocklist: row.get::<i64, _>("blocklist_count") as u64,
+            queries_blocked_by_managed_domain: row.get::<i64, _>("managed_domain_count") as u64,
+            queries_blocked_by_regex_filter: row.get::<i64, _>("regex_filter_count") as u64,
             queries_by_type: std::collections::HashMap::new(),
             most_queried_type: None,
             record_type_distribution: Vec::new(),

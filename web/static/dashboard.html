@@ -280,6 +280,18 @@
                             this.queryTypes = {...this.stats.queries_by_type};
                             if (this.chartsReady) this.updateQueryTypesChart();
                         }
+                        // Usar source_stats do servidor (dados completos das 24h)
+                        if (this.stats.source_stats) {
+                            const ss = this.stats.source_stats;
+                            this.sourceStats = {
+                                cache:          ss.cache_hits            || 0,
+                                upstream:       ss.upstream              || 0,
+                                blocklist:      ss.blocked_by_blocklist  || 0,
+                                managed_domain: ss.blocked_by_managed_domain || 0,
+                                regex_filter:   ss.blocked_by_regex_filter   || 0,
+                            };
+                            if (this.chartsReady) this.updateCacheSourceChart();
+                        }
                     }
                 } catch (e) {
                     if (e.name !== 'AbortError') console.error(e)
@@ -317,25 +329,8 @@
                             queries.forEach(q => {
                                 this.queryTypes[q.type] = (this.queryTypes[q.type] || 0) + 1;
                             });
+                            this.updateQueryTypesChart();
                         }
-
-                        // Query Source: ainda usa as queries raw (não disponível em /api/stats)
-                        const src = {cache: 0, upstream: 0, blocklist: 0, managed_domain: 0, regex_filter: 0};
-                        queries.forEach(q => {
-                            if (q.cache_hit) {
-                                src.cache++;
-                            } else if (q.blocked) {
-                                const bs = q.block_source;
-                                if (bs === 'managed_domain') src.managed_domain++;
-                                else if (bs === 'regex_filter') src.regex_filter++;
-                                else src.blocklist++;
-                            } else {
-                                src.upstream++;
-                            }
-                        });
-                        this.sourceStats = src;
-                        this.updateQueryTypesChart();
-                        this.updateCacheSourceChart();
                     }
                 } catch (e) {
                     console.error(e)
