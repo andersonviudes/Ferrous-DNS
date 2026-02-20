@@ -405,6 +405,41 @@
         </div>
 
         <div class="card">
+            <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary)">General Settings</h2>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px">Core DNS resolution behavior settings.</p>
+
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border-color)">
+                <div style="flex:1;margin-right:24px">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <i data-lucide="shield-check" style="width:20px;height:20px;color:var(--color-primary)"></i>
+                        <h4 style="font-size:16px;font-weight:600;margin:0">DNSSEC Validation</h4>
+                    </div>
+                    <p style="font-size:13px;color:var(--text-secondary);margin:0">Validates DNSSEC cryptographic signatures on upstream responses to protect against DNS spoofing and cache poisoning attacks. When enabled, Ferrous DNS rejects responses that fail signature verification.</p>
+                    <p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0;font-style:italic">Requires upstream servers that support DNSSEC. May slightly increase response latency due to signature validation overhead.</p>
+                </div>
+                <div @click="config.dns.dnssec_enabled=!config.dns.dnssec_enabled"
+                     :class="config.dns.dnssec_enabled?'active':''" class="toggle-switch">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0">
+                <div style="flex:1;margin-right:24px">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <i data-lucide="database" style="width:20px;height:20px;color:var(--color-primary)"></i>
+                        <h4 style="font-size:16px;font-weight:600;margin:0">Enable DNS Cache</h4>
+                    </div>
+                    <p style="font-size:13px;color:var(--text-secondary);margin:0">Stores DNS responses in memory so repeated queries are answered instantly without contacting upstream servers. Dramatically reduces resolution latency for frequently accessed domains.</p>
+                    <p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0;font-style:italic">Disable only for debugging purposes. Detailed cache configuration is available in the Cache Settings tab.</p>
+                </div>
+                <div @click="config.dns.cache_enabled=!config.dns.cache_enabled"
+                     :class="config.dns.cache_enabled?'active':''" class="toggle-switch">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
                 <div>
                     <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 4px">Upstream DNS Pools</h2>
@@ -524,41 +559,6 @@
                 <div style="flex-shrink:0;width:150px">
                     <input type="number" x-model.number="config.dns.health_check.success_threshold" min="1" placeholder="2" style="width:100%;text-align:right">
                     <p style="font-size:11px;color:var(--text-tertiary);margin:4px 0 0;text-align:right">successes</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary)">General Settings</h2>
-            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px">Core DNS resolution behavior settings.</p>
-
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border-color)">
-                <div style="flex:1;margin-right:24px">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                        <i data-lucide="shield-check" style="width:20px;height:20px;color:var(--color-primary)"></i>
-                        <h4 style="font-size:16px;font-weight:600;margin:0">DNSSEC Validation</h4>
-                    </div>
-                    <p style="font-size:13px;color:var(--text-secondary);margin:0">Validates DNSSEC cryptographic signatures on upstream responses to protect against DNS spoofing and cache poisoning attacks. When enabled, Ferrous DNS rejects responses that fail signature verification.</p>
-                    <p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0;font-style:italic">Requires upstream servers that support DNSSEC. May slightly increase response latency due to signature validation overhead.</p>
-                </div>
-                <div @click="config.dns.dnssec_enabled=!config.dns.dnssec_enabled"
-                     :class="config.dns.dnssec_enabled?'active':''" class="toggle-switch">
-                    <div class="toggle-slider"></div>
-                </div>
-            </div>
-
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0">
-                <div style="flex:1;margin-right:24px">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                        <i data-lucide="database" style="width:20px;height:20px;color:var(--color-primary)"></i>
-                        <h4 style="font-size:16px;font-weight:600;margin:0">Enable DNS Cache</h4>
-                    </div>
-                    <p style="font-size:13px;color:var(--text-secondary);margin:0">Stores DNS responses in memory so repeated queries are answered instantly without contacting upstream servers. Dramatically reduces resolution latency for frequently accessed domains.</p>
-                    <p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0;font-style:italic">Disable only for debugging purposes. Detailed cache configuration is available in the Cache Settings tab.</p>
-                </div>
-                <div @click="config.dns.cache_enabled=!config.dns.cache_enabled"
-                     :class="config.dns.cache_enabled?'active':''" class="toggle-switch">
-                    <div class="toggle-slider"></div>
                 </div>
             </div>
         </div>
