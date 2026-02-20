@@ -1,3 +1,4 @@
+use equivalent::Equivalent;
 use ferrous_dns_domain::RecordType;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -86,5 +87,16 @@ impl<'a> PartialEq<BorrowedKey<'a>> for CacheKey {
     #[inline]
     fn eq(&self, other: &BorrowedKey<'a>) -> bool {
         self.record_type == other.record_type && self.domain.as_ref() == other.domain
+    }
+}
+
+/// Allows `BorrowedKey` to be used as a zero-allocation lookup key in any
+/// `hashbrown`-backed map that accepts `Q: Equivalent<K>` (e.g. future
+/// versions of DashMap that expose this bound, or direct `hashbrown::HashMap`
+/// lookups via raw-shard access).
+impl<'a> Equivalent<CacheKey> for BorrowedKey<'a> {
+    #[inline]
+    fn equivalent(&self, key: &CacheKey) -> bool {
+        self.record_type == key.record_type && self.domain == key.domain.as_ref()
     }
 }
