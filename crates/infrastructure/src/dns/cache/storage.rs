@@ -360,66 +360,68 @@ impl DnsCache {
             return;
         }
 
-        // Single clock read shared across all eviction iterations.
         let now_secs = coarse_now_secs();
+        let total_to_sample = count * EVICTION_SAMPLE_SIZE;
+
+        // Single scan: collect urgent (expired + low-score) and scored entries.
+        // Avoids N separate DashMap iterator allocations for N evictions.
+        let mut urgent_expired: Vec<CacheKey> = Vec::new();
+        let mut scored: Vec<(CacheKey, f64)> = Vec::new();
+        let mut sampled = 0usize;
+
+        for entry in self.cache.iter() {
+            if sampled >= total_to_sample {
+                break;
+            }
+            let record = entry.value();
+            if record.is_marked_for_deletion() {
+                continue;
+            }
+
+            if record.is_expired_at_secs(now_secs) {
+                // Expired entries inside the access window are candidates for urgent
+                // refresh (handled by the refresh cycle) — score them normally so
+                // they are not evicted before being renewed.
+                // Expired entries outside the window with a negative score are
+                // evicted immediately without consuming a scored slot.
+                let hit_count = record.hit_count.load(AtomicOrdering::Relaxed);
+                let last_access = record.last_access.load(AtomicOrdering::Relaxed);
+                let within_window = hit_count > 0
+                    && now_secs.saturating_sub(last_access) <= self.access_window_secs;
+
+                if !within_window {
+                    let score = self.compute_score(record, now_secs);
+                    if score < 0.0 {
+                        urgent_expired.push(entry.key().clone());
+                        sampled += 1;
+                        continue;
+                    }
+                }
+            }
+
+            let score = self.compute_score(record, now_secs);
+            scored.push((entry.key().clone(), score));
+            sampled += 1;
+        }
+        // Iterator released — safe to acquire write locks below.
+
+        // Sort ascending: lowest score (worst candidate) first.
+        scored.sort_unstable_by(|a, b| {
+            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         let mut total_evicted = 0usize;
         let mut last_worst_score = f64::MAX;
 
-        for _ in 0..count {
-            let mut worst_key: Option<CacheKey> = None;
-            let mut worst_score = f64::MAX;
-            let mut sampled = 0usize;
-            let mut expired_key: Option<CacheKey> = None;
+        for key in urgent_expired.into_iter().take(count) {
+            self.cache.remove(&key);
+            total_evicted += 1;
+        }
 
-            for entry in self.cache.iter() {
-                let record = entry.value();
-                if record.is_marked_for_deletion() {
-                    continue;
-                }
-
-                if record.is_expired_at_secs(now_secs) {
-                    // Fix 3: free-evict expiradas apenas se fora da janela E score negativo.
-                    // Entradas dentro da janela serão renovadas pelo ciclo de refresh urgente.
-                    // Entradas com score ≥ 0 fora da janela entram no scoring normal e
-                    // re-entram na janela no próximo acesso.
-                    let hit_count = record.hit_count.load(AtomicOrdering::Relaxed);
-                    let last_access = record.last_access.load(AtomicOrdering::Relaxed);
-                    let age_since_access = now_secs.saturating_sub(last_access);
-                    let within_window =
-                        hit_count > 0 && age_since_access <= self.access_window_secs;
-
-                    if !within_window {
-                        let score = self.compute_score(record, now_secs);
-                        if score < 0.0 {
-                            // Score negativo = abaixo do mínimo da estratégia → free-evict
-                            expired_key = Some(entry.key().clone());
-                            break;
-                        }
-                        // Score ≥ 0 + fora da janela: cai no scoring normal abaixo
-                    }
-                    // Dentro da janela: scoring normal (refresh urgente a renovará)
-                }
-
-                let score = self.compute_score(record, now_secs);
-                if score < worst_score {
-                    worst_score = score;
-                    worst_key = Some(entry.key().clone());
-                }
-                sampled += 1;
-                if sampled >= EVICTION_SAMPLE_SIZE {
-                    break;
-                }
-            }
-            // Iterator is out of scope here — safe to acquire write locks below.
-
-            if let Some(key) = expired_key {
-                self.cache.remove(&key);
-                total_evicted += 1;
-            } else if let Some(key) = worst_key {
-                self.cache.remove(&key);
-                total_evicted += 1;
-                last_worst_score = worst_score;
-            }
+        for (key, score) in scored.into_iter().take(count.saturating_sub(total_evicted)) {
+            self.cache.remove(&key);
+            total_evicted += 1;
+            last_worst_score = score;
         }
 
         self.metrics
@@ -428,8 +430,7 @@ impl DnsCache {
 
         if self.adaptive_thresholds && last_worst_score < f64::MAX {
             let current = self.get_threshold();
-            let new_threshold = (current * 0.9) + (last_worst_score * 0.1);
-            self.set_threshold(new_threshold);
+            self.set_threshold((current * 0.9) + (last_worst_score * 0.1));
         }
     }
 
