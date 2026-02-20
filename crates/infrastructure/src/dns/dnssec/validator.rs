@@ -273,6 +273,14 @@ impl DnssecValidator {
         }
 
         if rrsigs.is_empty() {
+            if data_records.is_empty() {
+                // NODATA / NXDOMAIN response: the answer section is empty, so there are
+                // no records to sign and no RRSIGs to verify.  The chain of trust already
+                // authenticated the zone; returning Bogus here would be wrong.
+                debug!(domain = %domain, "NODATA response — chain validation sufficient");
+                return ValidationResult::Secure;
+            }
+            // Data records present but no RRSIG: unsigned RRset inside a signed zone.
             debug!(domain = %domain, "No RRSIG for RRset — returning Bogus");
             return ValidationResult::Bogus;
         }
@@ -368,11 +376,14 @@ mod tests {
     // -------------------------------------------------------------------------
 
     #[test]
-    fn test_verify_rrset_empty_records_returns_bogus() {
+    fn test_verify_rrset_empty_records_returns_secure() {
+        // Empty answer section = NODATA / NXDOMAIN response.  The chain of trust
+        // already authenticated the zone; there are no records to verify, so the
+        // result should be Secure (not Bogus).
         let validator = make_validator();
         assert_eq!(
             validator.verify_rrset_signatures("example.com.", &[]),
-            ValidationResult::Bogus
+            ValidationResult::Secure
         );
     }
 
