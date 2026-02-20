@@ -104,15 +104,17 @@ impl DnsCache {
         domain: &Arc<str>,
         record_type: &RecordType,
     ) -> Option<(CachedData, Option<DnssecStatus>, Option<u32>)> {
+        // L1 (thread-local, ~50 cycles) before bloom (5 hashes + 5 atomic loads, ~25 ns).
+        // On hot-path cache hits, this avoids bloom computation entirely.
+        if let Some((arc_data, remaining_ttl)) = l1_get(domain.as_ref(), record_type) {
+            self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
+            return Some((CachedData::IpAddresses(arc_data), None, Some(remaining_ttl)));
+        }
+
         let borrowed = BorrowedKey::new(domain.as_ref(), *record_type);
         if !self.bloom.check(&borrowed) {
             self.metrics.misses.fetch_add(1, AtomicOrdering::Relaxed);
             return None;
-        }
-
-        if let Some((arc_data, remaining_ttl)) = l1_get(domain.as_ref(), record_type) {
-            self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
-            return Some((CachedData::IpAddresses(arc_data), None, Some(remaining_ttl)));
         }
 
         let key = CacheKey::new(domain.as_ref(), *record_type);
@@ -288,7 +290,6 @@ impl DnsCache {
             record.expires_at_secs = now + new_ttl as u64;
             record.inserted_at_secs = now;
             record.ttl = new_ttl;
-            record.data = new_data.clone();
             if let Some(ds) = dnssec_status {
                 record.dnssec_status = ds;
             }
@@ -296,8 +297,16 @@ impl DnsCache {
                 .refreshing
                 .store(false, std::sync::atomic::Ordering::Relaxed);
 
-            if let CachedData::IpAddresses(ref addresses) = new_data {
-                l1_insert(domain, record_type, Arc::clone(addresses), new_ttl);
+            // Extract Arc before moving new_data so we only increment the refcount once.
+            let maybe_addresses = if let CachedData::IpAddresses(ref addr) = new_data {
+                Some(Arc::clone(addr))
+            } else {
+                None
+            };
+            record.data = new_data;
+
+            if let Some(addresses) = maybe_addresses {
+                l1_insert(domain, record_type, addresses, new_ttl);
             }
             true
         } else {
