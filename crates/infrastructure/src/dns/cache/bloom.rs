@@ -13,9 +13,7 @@ impl AtomicBloom {
         let num_bits = Self::optimal_num_bits(capacity, fp_rate);
         let num_hashes = Self::optimal_num_hashes(capacity, num_bits);
         let num_words = num_bits.div_ceil(64);
-        let bits = (0..num_words)
-            .map(|_| AtomicU64::new(0))
-            .collect();
+        let bits = (0..num_words).map(|_| AtomicU64::new(0)).collect();
         Self {
             bits,
             mask: (num_bits as u64) - 1,
@@ -73,31 +71,25 @@ impl AtomicBloom {
 
         if num_hashes == 5 {
             let idx0 = Self::nth_hash(h1, h2, 0, mask);
-            self.bits[idx0 / 64]
-                .fetch_or(1u64 << (idx0 % 64), AtomicOrdering::Relaxed);
+            self.bits[idx0 / 64].fetch_or(1u64 << (idx0 % 64), AtomicOrdering::Relaxed);
 
             let idx1 = Self::nth_hash(h1, h2, 1, mask);
-            self.bits[idx1 / 64]
-                .fetch_or(1u64 << (idx1 % 64), AtomicOrdering::Relaxed);
+            self.bits[idx1 / 64].fetch_or(1u64 << (idx1 % 64), AtomicOrdering::Relaxed);
 
             let idx2 = Self::nth_hash(h1, h2, 2, mask);
-            self.bits[idx2 / 64]
-                .fetch_or(1u64 << (idx2 % 64), AtomicOrdering::Relaxed);
+            self.bits[idx2 / 64].fetch_or(1u64 << (idx2 % 64), AtomicOrdering::Relaxed);
 
             let idx3 = Self::nth_hash(h1, h2, 3, mask);
-            self.bits[idx3 / 64]
-                .fetch_or(1u64 << (idx3 % 64), AtomicOrdering::Relaxed);
+            self.bits[idx3 / 64].fetch_or(1u64 << (idx3 % 64), AtomicOrdering::Relaxed);
 
             let idx4 = Self::nth_hash(h1, h2, 4, mask);
-            self.bits[idx4 / 64]
-                .fetch_or(1u64 << (idx4 % 64), AtomicOrdering::Relaxed);
+            self.bits[idx4 / 64].fetch_or(1u64 << (idx4 % 64), AtomicOrdering::Relaxed);
         } else {
             for i in 0..num_hashes {
                 let bit_idx = Self::nth_hash(h1, h2, i as u64, mask);
                 let word_idx = bit_idx / 64;
                 let bit_pos = bit_idx % 64;
-                self.bits[word_idx]
-                    .fetch_or(1u64 << bit_pos, AtomicOrdering::Relaxed);
+                self.bits[word_idx].fetch_or(1u64 << bit_pos, AtomicOrdering::Relaxed);
             }
         }
     }
