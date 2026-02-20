@@ -308,8 +308,7 @@ impl SignatureVerifier {
             ));
         }
 
-        let public_key =
-            signature::UnparsedPublicKey::new(&signature::ED25519, &dnskey.public_key);
+        let public_key = signature::UnparsedPublicKey::new(&signature::ED25519, &dnskey.public_key);
 
         match public_key.verify(data, sig) {
             Ok(_) => Ok(true),

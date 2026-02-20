@@ -150,9 +150,8 @@ impl DnssecValidator {
         // (which would be absent and wrongly return Insecure).
         // For unsigned domains the answer has no RRSIG, so we fall back to the raw domain;
         // a DS query for it returns empty → InsecureDelegation → Insecure, as expected.
-        let chain_domain =
-            Self::extract_signer_zone(upstream_result.response.message.answers())
-                .unwrap_or_else(|| domain.to_owned());
+        let chain_domain = Self::extract_signer_zone(upstream_result.response.message.answers())
+            .unwrap_or_else(|| domain.to_owned());
 
         let mut validation_status = self
             .chain_verifier
