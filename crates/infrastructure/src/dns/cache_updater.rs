@@ -172,15 +172,13 @@ impl CacheUpdater {
             Ok(resolution) if !resolution.addresses.is_empty() => {
                 let response_time = start.elapsed().as_micros() as u64;
 
-                let ttl = cache.get_ttl(domain, record_type).unwrap_or(3600);
-
                 let dnssec_status: Option<super::cache::DnssecStatus> =
                     resolution.dnssec_status.and_then(|s| s.parse().ok());
 
                 let refreshed = cache.refresh_record(
                     domain,
                     record_type,
-                    ttl,
+                    None,
                     super::cache::CachedData::IpAddresses(Arc::clone(&resolution.addresses)),
                     dnssec_status.map(|_| super::cache::DnssecStatus::Unknown),
                 );

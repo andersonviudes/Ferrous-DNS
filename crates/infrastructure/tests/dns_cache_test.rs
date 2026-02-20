@@ -376,7 +376,7 @@ fn test_refresh_record_updates_ttl_fields() {
     let renewed = cache.refresh_record(
         "renew.com",
         &RecordType::A,
-        7200,
+        Some(7200),
         make_ip_data("9.9.9.9"),
         None,
     );
@@ -430,7 +430,7 @@ fn test_refresh_record_preserves_hit_count_for_subsequent_candidates() {
     cache.refresh_record(
         "keep-alive.com",
         &RecordType::CNAME,
-        300,
+        Some(300),
         make_cname_data("alias.keep-alive.com"),
         None,
     );
@@ -452,7 +452,7 @@ fn test_refresh_record_returns_false_for_missing_entry() {
     let result = cache.refresh_record(
         "nonexistent.com",
         &RecordType::A,
-        300,
+        Some(300),
         make_ip_data("1.1.1.1"),
         None,
     );

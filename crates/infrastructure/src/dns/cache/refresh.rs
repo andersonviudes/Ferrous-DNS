@@ -53,8 +53,8 @@ impl DnsCache {
             }
 
             if record.is_expired_at_secs(now) {
-                if record.is_stale_usable_at_secs(now) {
-                    if record
+                if record.is_stale_usable_at_secs(now)
+                    && record
                         .refreshing
                         .compare_exchange(
                             false,
@@ -63,9 +63,8 @@ impl DnsCache {
                             AtomicOrdering::Relaxed,
                         )
                         .is_ok()
-                    {
-                        candidates.push((key.domain.clone(), key.record_type));
-                    }
+                {
+                    candidates.push((key.domain.clone(), key.record_type));
                 }
                 continue;
             }

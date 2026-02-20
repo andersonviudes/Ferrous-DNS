@@ -26,10 +26,7 @@ impl AssignClientGroupUseCase {
             self.group_repo
                 .get_by_id(group_id)
                 .await?
-                .ok_or(DomainError::GroupNotFound(format!(
-                    "Group {} not found",
-                    group_id
-                )))?;
+                .ok_or(DomainError::GroupNotFound(group_id))?;
 
         let _client = self
             .client_repo

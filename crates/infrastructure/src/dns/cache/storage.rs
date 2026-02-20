@@ -169,8 +169,14 @@ impl DnsCache {
             self.evict_entries();
         }
 
+        let maybe_l1 = if let CachedData::IpAddresses(ref addr) = data {
+            Some(Arc::clone(addr))
+        } else {
+            None
+        };
+
         let use_lfuk = self.eviction_policy.uses_access_history();
-        let record = CachedRecord::new(data.clone(), ttl, record_type, use_lfuk, dnssec_status);
+        let record = CachedRecord::new(data, ttl, record_type, use_lfuk, dnssec_status);
 
         match self.cache.entry(key) {
             dashmap::Entry::Vacant(e) => {
@@ -182,8 +188,8 @@ impl DnsCache {
             }
         }
 
-        if let CachedData::IpAddresses(ref addresses) = data {
-            l1_insert(domain, &record_type, Arc::clone(addresses), ttl);
+        if let Some(addresses) = maybe_l1 {
+            l1_insert(domain, &record_type, addresses, ttl);
         }
 
         debug!(
@@ -208,16 +214,17 @@ impl DnsCache {
             self.evict_entries();
         }
 
-        let record = CachedRecord::permanent(data.clone(), 365 * 24 * 60 * 60, record_type);
+        let maybe_l1 = if let CachedData::IpAddresses(ref addr) = data {
+            Some(Arc::clone(addr))
+        } else {
+            None
+        };
+
+        let record = CachedRecord::permanent(data, 365 * 24 * 60 * 60, record_type);
         self.cache.insert(key, record);
 
-        if let CachedData::IpAddresses(ref addresses) = data {
-            l1_insert(
-                domain,
-                &record_type,
-                Arc::clone(addresses),
-                365 * 24 * 60 * 60,
-            );
+        if let Some(addresses) = maybe_l1 {
+            l1_insert(domain, &record_type, addresses, 365 * 24 * 60 * 60);
         }
     }
 
@@ -276,7 +283,7 @@ impl DnsCache {
         &self,
         domain: &str,
         record_type: &RecordType,
-        new_ttl: u32,
+        new_ttl: Option<u32>,
         new_data: CachedData,
         dnssec_status: Option<DnssecStatus>,
     ) -> bool {
@@ -288,9 +295,10 @@ impl DnsCache {
             if record.permanent || record.is_marked_for_deletion() {
                 return false;
             }
-            record.expires_at_secs = now + new_ttl as u64;
+            let ttl = new_ttl.unwrap_or(record.ttl);
+            record.expires_at_secs = now + ttl as u64;
             record.inserted_at_secs = now;
-            record.ttl = new_ttl;
+            record.ttl = ttl;
             if let Some(ds) = dnssec_status {
                 record.dnssec_status = ds;
             }
@@ -306,7 +314,7 @@ impl DnsCache {
             record.data = new_data;
 
             if let Some(addresses) = maybe_addresses {
-                l1_insert(domain, record_type, addresses, new_ttl);
+                l1_insert(domain, record_type, addresses, ttl);
             }
             true
         } else {

@@ -1,4 +1,5 @@
 pub mod block_source;
+pub mod validators;
 pub mod blocklist;
 pub mod blocklist_source;
 pub mod client;
