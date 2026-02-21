@@ -132,8 +132,6 @@ impl DnsCache {
             }
 
             if record.is_expired_at_secs(now_secs) {
-                // Mark for deletion while holding the existing ref — avoids a
-                // second DashMap lock acquisition that lazy_remove() would cause.
                 record.mark_for_deletion();
                 drop(entry);
                 self.metrics.misses.fetch_add(1, AtomicOrdering::Relaxed);
@@ -177,6 +175,7 @@ impl DnsCache {
 
         let use_lfuk = self.eviction_policy.uses_access_history();
         let record = CachedRecord::new(data, ttl, record_type, use_lfuk, dnssec_status);
+        let expires_secs = record.expires_at_secs;
 
         match self.cache.entry(key) {
             dashmap::Entry::Vacant(e) => {
@@ -189,7 +188,7 @@ impl DnsCache {
         }
 
         if let Some(addresses) = maybe_l1 {
-            l1_insert(domain, &record_type, addresses, ttl);
+            l1_insert(domain, &record_type, addresses, expires_secs);
         }
 
         debug!(
@@ -224,7 +223,7 @@ impl DnsCache {
         self.cache.insert(key, record);
 
         if let Some(addresses) = maybe_l1 {
-            l1_insert(domain, &record_type, addresses, 365 * 24 * 60 * 60);
+            l1_insert(domain, &record_type, addresses, u64::MAX);
         }
     }
 
@@ -314,7 +313,7 @@ impl DnsCache {
             record.data = new_data;
 
             if let Some(addresses) = maybe_addresses {
-                l1_insert(domain, record_type, addresses, ttl);
+                l1_insert(domain, record_type, addresses, record.expires_at_secs);
             }
             true
         } else {
@@ -330,12 +329,10 @@ impl DnsCache {
         now_secs: u64,
     ) {
         if let CachedData::IpAddresses(ref addresses) = record.data {
-            let remaining_secs = match record.expires_at_secs.checked_sub(now_secs) {
-                Some(r) if r > 0 => r as u32,
-                _ => return,
-            };
-
-            l1_insert(domain, record_type, Arc::clone(addresses), remaining_secs);
+            if record.expires_at_secs <= now_secs {
+                return;
+            }
+            l1_insert(domain, record_type, Arc::clone(addresses), record.expires_at_secs);
         }
     }
 
