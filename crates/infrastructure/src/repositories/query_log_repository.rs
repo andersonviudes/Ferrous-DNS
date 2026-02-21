@@ -1,17 +1,16 @@
 use async_trait::async_trait;
 use compact_str::CompactString;
 use ferrous_dns_application::ports::QueryLogRepository;
-use ferrous_dns_domain::{BlockSource, DomainError, QueryLog, QuerySource, QueryStats};
+use ferrous_dns_domain::{
+    config::DatabaseConfig, BlockSource, DomainError, QueryLog, QuerySource, QueryStats,
+};
 use sqlx::{sqlite::SqliteRow, Row, SqlitePool};
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
-
-const CHANNEL_CAPACITY: usize = 10_000;
-const MAX_BATCH_SIZE: usize = 500;
-const FLUSH_INTERVAL_MS: u64 = 100;
 
 /// Number of columns per row in `query_log` INSERT.
 const COLS_PER_ROW: usize = 13;
@@ -145,32 +144,57 @@ fn row_to_query_log(row: SqliteRow) -> Option<QueryLog> {
 }
 
 pub struct SqliteQueryLogRepository {
-    pool: SqlitePool,
+    /// Used by: flush_loop (batch INSERTs), delete_older_than.
+    write_pool: SqlitePool,
+    /// Used by: all read methods (get_stats, get_recent, get_recent_paged, etc.).
+    /// Kept on a separate pool so dashboard reads never wait for the flush task.
+    read_pool: SqlitePool,
     sender: mpsc::Sender<QueryLogEntry>,
+    /// Log 1 of every `sample_rate` queries; 1 = log all.
+    sample_rate: u32,
+    /// Monotonic counter for uniform sampling. Relaxed ordering is safe: we
+    /// only need to avoid data races, not sequential consistency.
+    sample_counter: AtomicU64,
 }
 
 impl SqliteQueryLogRepository {
-    pub fn new(pool: SqlitePool) -> Self {
-        let (sender, receiver) = mpsc::channel(CHANNEL_CAPACITY);
+    pub fn new(write_pool: SqlitePool, read_pool: SqlitePool, cfg: &DatabaseConfig) -> Self {
+        let channel_capacity = cfg.query_log_channel_capacity;
+        let max_batch_size = cfg.query_log_max_batch_size;
+        let flush_interval_ms = cfg.query_log_flush_interval_ms;
 
-        let flush_pool = pool.clone();
+        let (sender, receiver) = mpsc::channel(channel_capacity);
+
+        let flush_pool = write_pool.clone();
         tokio::spawn(async move {
-            Self::flush_loop(flush_pool, receiver).await;
+            Self::flush_loop(flush_pool, receiver, max_batch_size, flush_interval_ms).await;
         });
 
         info!(
-            channel_capacity = CHANNEL_CAPACITY,
-            batch_size = MAX_BATCH_SIZE,
-            flush_interval_ms = FLUSH_INTERVAL_MS,
+            channel_capacity,
+            batch_size = max_batch_size,
+            flush_interval_ms,
+            sample_rate = cfg.query_log_sample_rate,
             "Query log batching enabled"
         );
 
-        Self { pool, sender }
+        Self {
+            write_pool,
+            read_pool,
+            sender,
+            sample_rate: cfg.query_log_sample_rate,
+            sample_counter: AtomicU64::new(0),
+        }
     }
 
-    async fn flush_loop(pool: SqlitePool, mut receiver: mpsc::Receiver<QueryLogEntry>) {
-        let mut batch: Vec<QueryLogEntry> = Vec::with_capacity(MAX_BATCH_SIZE);
-        let mut flush_interval = tokio::time::interval(Duration::from_millis(FLUSH_INTERVAL_MS));
+    async fn flush_loop(
+        pool: SqlitePool,
+        mut receiver: mpsc::Receiver<QueryLogEntry>,
+        max_batch_size: usize,
+        flush_interval_ms: u64,
+    ) {
+        let mut batch: Vec<QueryLogEntry> = Vec::with_capacity(max_batch_size);
+        let mut flush_interval = tokio::time::interval(Duration::from_millis(flush_interval_ms));
 
         loop {
             tokio::select! {
@@ -178,13 +202,13 @@ impl SqliteQueryLogRepository {
                     match maybe_entry {
                         Some(entry) => {
                             batch.push(entry);
-                            while batch.len() < MAX_BATCH_SIZE {
+                            while batch.len() < max_batch_size {
                                 match receiver.try_recv() {
                                     Ok(e) => batch.push(e),
                                     Err(_) => break,
                                 }
                             }
-                            if batch.len() >= MAX_BATCH_SIZE {
+                            if batch.len() >= max_batch_size {
                                 Self::flush_batch(&pool, &mut batch).await;
                             }
                         }
@@ -277,6 +301,16 @@ impl QueryLogRepository for SqliteQueryLogRepository {
     }
 
     fn log_query_sync(&self, query: &QueryLog) -> Result<(), DomainError> {
+        // Uniform sampling: drop 1 - (1/sample_rate) fraction of queries.
+        // AtomicU64 with Relaxed ordering avoids data races while adding no
+        // synchronisation overhead on the hot path.
+        if self.sample_rate > 1 {
+            let n = self.sample_counter.fetch_add(1, Ordering::Relaxed);
+            if !n.is_multiple_of(self.sample_rate as u64) {
+                return Ok(());
+            }
+        }
+
         let entry = QueryLogEntry::from_query_log(query);
         match self.sender.try_send(entry) {
             Ok(()) => Ok(()),
@@ -314,7 +348,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         )
         .bind(period_hours)
         .bind(limit as i64)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch recent queries");
@@ -341,20 +375,10 @@ impl QueryLogRepository for SqliteQueryLogRepository {
             "Fetching paginated queries"
         );
 
-        let count_row = sqlx::query(
-            "SELECT COUNT(*) as total FROM query_log
-             WHERE created_at >= datetime('now', '-' || ? || ' hours')
-               AND query_source = 'client'",
-        )
-        .bind(period_hours)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to count queries");
-            DomainError::InvalidDomainName(format!("Database error: {}", e))
-        })?;
-
-        let total = count_row.get::<i64, _>("total") as u64;
+        // Fetch limit+1 rows to determine whether a next page exists without
+        // running a separate COUNT(*) query over the full 24-hour window.
+        // This keeps the query O(page_size) regardless of total table size.
+        let fetch_limit = limit as i64 + 1;
 
         let rows = sqlx::query(
             "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id, block_source,
@@ -366,23 +390,38 @@ impl QueryLogRepository for SqliteQueryLogRepository {
              LIMIT ? OFFSET ?",
         )
         .bind(period_hours)
-        .bind(limit as i64)
+        .bind(fetch_limit)
         .bind(offset as i64)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch paginated queries");
             DomainError::InvalidDomainName(format!("Database error: {}", e))
         })?;
 
+        let mut rows = rows;
+        let has_more = rows.len() as u32 > limit;
+        // Trim the extra sentinel row before converting.
+        if has_more {
+            rows.truncate(limit as usize);
+        }
+
         let entries: Vec<QueryLog> = rows.into_iter().filter_map(row_to_query_log).collect();
+
+        // Return an estimated total that keeps the frontend pagination working:
+        // if there are more rows the total is offset + limit + 1 (at least one
+        // more page), otherwise it is the exact count.
+        let estimated_total = if has_more {
+            offset as u64 + limit as u64 + 1
+        } else {
+            offset as u64 + entries.len() as u64
+        };
 
         debug!(
             count = entries.len(),
-            total = total,
-            "Paginated queries fetched"
+            estimated_total, "Paginated queries fetched"
         );
-        Ok((entries, total))
+        Ok((entries, estimated_total))
     }
 
     #[instrument(skip(self))]
@@ -411,7 +450,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                AND query_source = 'client'",
         )
         .bind(period_hours)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch statistics");
@@ -434,7 +473,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
              GROUP BY record_type",
         )
         .bind(period_hours)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch type distribution");
@@ -524,7 +563,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
 
         let rows = sqlx::query(&sql)
             .bind(period_hours as i64)
-            .fetch_all(&self.pool)
+            .fetch_all(&self.read_pool)
             .await
             .map_err(|e| {
                 error!(error = %e, "Failed to fetch timeline");
@@ -558,7 +597,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
              WHERE created_at >= datetime('now', '-' || ? || ' seconds')",
         )
         .bind(seconds_ago)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to count queries");
@@ -587,7 +626,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
              WHERE created_at >= datetime('now', '-' || ? || ' hours')",
         )
         .bind(period_hours)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.read_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to fetch cache statistics");
@@ -633,7 +672,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
             "DELETE FROM query_log WHERE created_at < datetime('now', '-' || ? || ' days')",
         )
         .bind(days as i64)
-        .execute(&self.pool)
+        .execute(&self.write_pool)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to delete old query logs");
