@@ -51,11 +51,9 @@ mod tests {
         let _ = cache.get(&Arc::from("a.com"), &RecordType::A);
 
         let policy = LruPolicy;
-        // Verificar via cache: LRU score é baseado em last_access
-        // Score aumenta com o tempo de acesso (mais recente = score maior = sobrevive)
         let result = cache.get(&Arc::from("a.com"), &RecordType::A);
         assert!(result.is_some(), "Entrada deve existir");
-        let _ = policy; // usado indiretamente via cache
+        let _ = policy;
     }
 
     #[test]

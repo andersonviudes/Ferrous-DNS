@@ -89,11 +89,9 @@ mod tests {
             None,
         );
 
-        // Aguardar expiração e avançar o relógio coarse
         std::thread::sleep(std::time::Duration::from_secs(2));
         coarse_clock::tick();
 
-        // A entrada está expirada mas NÃO marcada para deleção
         let removed = cache.compact();
         assert_eq!(
             removed, 0,
@@ -116,18 +114,15 @@ mod tests {
             None,
         );
 
-        // Aguardar expiração
         std::thread::sleep(std::time::Duration::from_secs(2));
         coarse_clock::tick();
 
-        // get() após expiração marca o record para deleção
         let result = cache.get(&Arc::from("to-delete.test"), &RecordType::CNAME);
         assert!(
             result.is_none(),
             "get() deve retornar None para entrada expirada"
         );
 
-        // Agora compact() deve removê-la
         let removed = cache.compact();
         assert_eq!(
             removed, 1,

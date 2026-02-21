@@ -34,12 +34,10 @@ impl DnsCache {
             }
             let record = entry.value();
 
-            // Lazy-deleted entries never get refreshed
             if record.is_marked_for_deletion() {
                 continue;
             }
 
-            // Negative responses and HTTPS records are never proactively refreshed
             if record.data.is_negative() {
                 continue;
             }
@@ -98,7 +96,7 @@ mod tests {
             max_entries: 100,
             eviction_strategy: EvictionStrategy::HitRate,
             min_threshold: 0.0,
-            refresh_threshold: 0.0, // toda entrada qualifica pelo tempo imediatamente
+            refresh_threshold: 0.0,
             batch_eviction_percentage: 0.2,
             adaptive_thresholds: false,
             min_frequency: 0,
@@ -121,7 +119,6 @@ mod tests {
         let cache = make_cache_with_window(7200);
         coarse_clock::tick();
 
-        // TTL=2s → grace period = 2×TTL = 4s. Sleep 3s: expirada mas ainda stale-usable (age=3 < 4).
         cache.insert(
             "expired-window.test",
             RecordType::CNAME,
@@ -129,10 +126,8 @@ mod tests {
             2,
             None,
         );
-        // Registrar hit para entrar na janela
         let _ = cache.get(&Arc::from("expired-window.test"), &RecordType::CNAME);
 
-        // Aguardar expiração do TTL=2s (grace period estende até inserted_at + 4s)
         std::thread::sleep(std::time::Duration::from_secs(3));
         coarse_clock::tick();
 
@@ -147,7 +142,7 @@ mod tests {
     /// Entrada expirada FORA da janela (window=0) → NÃO é candidato.
     #[test]
     fn test_refresh_excludes_expired_entry_outside_window() {
-        let cache = make_cache_with_window(0); // janela = 0s
+        let cache = make_cache_with_window(0);
         coarse_clock::tick();
 
         cache.insert(
@@ -185,7 +180,6 @@ mod tests {
             3600,
             None,
         );
-        // Sem chamada a get() → hit_count = 0
 
         let candidates = cache.get_refresh_candidates();
         assert!(
@@ -208,7 +202,6 @@ mod tests {
             3600,
             None,
         );
-        // refresh_threshold=0.0, então qualquer entrada com hit é candidata
         let _ = cache.get(&Arc::from("valid-hit.test"), &RecordType::CNAME);
 
         let candidates = cache.get_refresh_candidates();
@@ -234,7 +227,6 @@ mod tests {
         );
         let _ = cache.get(&Arc::from("refreshing.test"), &RecordType::CNAME);
 
-        // Simular que já está sendo refreshado
         let key = crate::dns::cache::key::CacheKey::new("refreshing.test", RecordType::CNAME);
         if let Some(entry) = cache.cache.get(&key) {
             entry.try_set_refreshing();
@@ -266,7 +258,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(2));
         coarse_clock::tick();
 
-        // get() após expiração marca para deleção
         let _ = cache.get(&Arc::from("marked.test"), &RecordType::CNAME);
 
         let candidates = cache.get_refresh_candidates();
