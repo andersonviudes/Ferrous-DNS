@@ -158,6 +158,11 @@ pub fn parse_query(buf: &[u8]) -> Option<FastPathQuery> {
                 if ar_pos + 4 > buf.len() {
                     return None;
                 }
+                if !is_valid_edns_version(buf[ar_pos + 1]) {
+                    // RFC 6891 §6.1.3: version != 0 → server must respond BADVERS.
+                    // Fall back to Hickory which handles this correctly.
+                    return None;
+                }
                 let do_flags = u16::from_be_bytes([buf[ar_pos + 2], buf[ar_pos + 3]]);
                 ar_pos += 4;
 
@@ -193,4 +198,8 @@ pub fn parse_query(buf: &[u8]) -> Option<FastPathQuery> {
         domain_buf,
         domain_len,
     })
+}
+
+fn is_valid_edns_version(version_byte: u8) -> bool {
+    version_byte == 0
 }
