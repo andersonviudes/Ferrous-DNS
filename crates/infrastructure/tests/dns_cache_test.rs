@@ -866,3 +866,40 @@ fn test_stale_while_revalidate_returns_nonzero_ttl() {
     }
     // Se None, o entry já passou do grace period — o teste é inconclusivo mas não falha
 }
+
+#[test]
+fn test_lfuk_new_entries_evicted_in_order_not_urgently() {
+    // Bug anterior: entries novas (hits=0) recebiam score negativo e iam para
+    // urgent_expired, sendo evictadas ANTES de entries com baixo-mas-positivo score.
+    // Após a fix: bootstrap score = min_lfuk_score, eviction é por ordenação normal.
+    //
+    // Cenário: todas as entries têm hits=0 → bootstrap score igual para todas.
+    // Após eviction, o cache deve ter ao menos (max_entries - batch_eviction) entries.
+    let cache = create_cache(5, EvictionStrategy::LFUK, 0, 5.0);
+
+    for i in 0..5 {
+        cache.insert(
+            &format!("new{i}.com"),
+            RecordType::CNAME,
+            make_cname_data(&format!("alias{i}.com")),
+            3600,
+            None,
+        );
+    }
+
+    let size_before = cache.len();
+    cache.evict_entries();
+    let size_after = cache.len();
+
+    // Com batch_eviction_percentage=0.2 e max_entries=5: remove 1 entry por ciclo
+    assert!(
+        size_after < size_before,
+        "Eviction deve remover ao menos 1 entry"
+    );
+    // Não deve ter esvaziado o cache (eviction controlada, não urgente)
+    assert!(
+        size_after >= 4,
+        "Eviction de batch 20% não deve remover mais que 1 entry de um cache de 5; após={}",
+        size_after
+    );
+}

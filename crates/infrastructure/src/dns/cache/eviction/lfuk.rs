@@ -22,6 +22,14 @@ impl EvictionPolicy for LfukPolicy {
     fn compute_score(&self, record: &CachedRecord, now_secs: u64) -> f64 {
         let last_access = record.counters.last_access.load(Ordering::Relaxed);
         let hits = record.counters.hit_count.load(Ordering::Relaxed) as f64;
+
+        // New entries (hits=0) receive a bootstrap score equal to min_lfuk_score.
+        // This prevents freshly inserted entries from being preferentially evicted
+        // before they have had a chance to accumulate access history.
+        if hits == 0.0 {
+            return self.min_lfuk_score;
+        }
+
         let age_secs = now_secs.saturating_sub(record.inserted_at_secs).max(1) as f64;
         let idle_secs = now_secs.saturating_sub(last_access) as f64;
 
@@ -63,16 +71,32 @@ mod tests {
     }
 
     #[test]
-    fn test_lfuk_score_below_min_is_negative() {
+    fn test_lfuk_score_zero_hits_returns_bootstrap_score() {
         let policy = LfukPolicy {
             min_lfuk_score: 1.5,
             k_value: 0.5,
         };
         let record = make_record_with_hits(0);
         let score = policy.compute_score(&record, 1_000_000);
+        assert_eq!(
+            score, 1.5,
+            "Entries com hits=0 devem receber bootstrap score igual a min_lfuk_score"
+        );
+    }
+
+    #[test]
+    fn test_lfuk_score_below_min_is_negative_after_first_hit() {
+        let policy = LfukPolicy {
+            min_lfuk_score: 100.0,
+            k_value: 0.5,
+        };
+        // 1 hit numa entrada muito antiga → score calculado será << min_lfuk_score
+        let record = make_record_with_hits(1);
+        let score = policy.compute_score(&record, 1_000_000);
         assert!(
             score < 0.0,
-            "Score deve ser negativo quando abaixo de min_lfuk_score"
+            "Entry com poucos hits e alto min_lfuk_score deve ter score negativo: {}",
+            score
         );
     }
 

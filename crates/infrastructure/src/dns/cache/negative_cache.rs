@@ -37,18 +37,21 @@ impl NegativeDnsCache {
     pub fn get(&self, domain: &str, record_type: &RecordType) -> Option<u32> {
         let key = CacheKey::new(domain, *record_type);
         let now = coarse_now_secs();
-        match self.cache.entry(key) {
-            dashmap::Entry::Vacant(_) => None,
-            dashmap::Entry::Occupied(e) => {
-                let expires = e.get().expires_at_secs;
-                if now >= expires {
-                    e.remove();
-                    None
-                } else {
-                    Some(expires.saturating_sub(now) as u32)
-                }
+
+        // Use read lock (get) for the common path to avoid write contention
+        // on hot negative-cache workloads where 50-70% of queries are NXDOMAIN.
+        if let Some(entry) = self.cache.get(&key) {
+            let expires = entry.value().expires_at_secs;
+            if now < expires {
+                return Some(expires.saturating_sub(now) as u32);
             }
+        } else {
+            return None;
         }
+
+        // Entry exists but is expired — acquire write lock only for removal.
+        self.cache.remove(&key);
+        None
     }
 
     pub fn insert(&self, domain: &str, record_type: RecordType, ttl: u32) {
