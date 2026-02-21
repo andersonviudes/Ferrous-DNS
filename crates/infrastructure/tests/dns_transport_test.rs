@@ -1,8 +1,10 @@
+use ferrous_dns_infrastructure::dns::fast_path;
 use ferrous_dns_infrastructure::dns::transport::DnsTransport;
 use ferrous_dns_infrastructure::dns::transport::{
     https::HttpsTransport, tcp::TcpTransport, tls::TlsTransport, udp::UdpTransport,
 };
-use std::net::SocketAddr;
+use ferrous_dns_infrastructure::dns::wire_response;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 mod helpers;
@@ -186,4 +188,105 @@ fn test_port_numbers() {
 
     assert_eq!(udp_addr.port(), 53, "Standard DNS port");
     assert_eq!(tls_addr.port(), 853, "DNS-over-TLS port");
+}
+
+// ── RFC 6891: OPT record in fast-path responses ───────────────────────────────
+
+fn build_edns_query() -> Vec<u8> {
+    // Minimal DNS query for "google.com" A with EDNS0 OPT (no DO bit):
+    // Header  : ID=0x0001, FLAGS=0x0000, QDCOUNT=1, ARCOUNT=1
+    // QNAME   : \x06google\x03com\x00
+    // QTYPE A : 0x0001,  QCLASS IN: 0x0001
+    // OPT RR  : root(1) + TYPE=41(2) + CLASS=4096(2) + TTL=0(4) + RDLEN=0(2)
+    vec![
+        0x00, 0x01, // ID
+        0x00, 0x00, // FLAGS (plain query, no flags)
+        0x00, 0x01, // QDCOUNT = 1
+        0x00, 0x00, // ANCOUNT = 0
+        0x00, 0x00, // NSCOUNT = 0
+        0x00, 0x01, // ARCOUNT = 1 (one OPT record)
+        // QNAME: google.com.
+        0x06, b'g', b'o', b'o', b'g', b'l', b'e',
+        0x03, b'c', b'o', b'm',
+        0x00,
+        // QTYPE A, QCLASS IN
+        0x00, 0x01, 0x00, 0x01,
+        // OPT RR
+        0x00,       // NAME = root
+        0x00, 0x29, // TYPE = OPT (41)
+        0x10, 0x00, // CLASS = 4096 (client UDP payload size)
+        0x00, 0x00, 0x00, 0x00, // TTL: extended RCODE=0, version=0, DO=0, Z=0
+        0x00, 0x00, // RDLENGTH = 0
+    ]
+}
+
+#[test]
+fn test_fast_path_response_includes_opt_when_client_sent_edns() {
+    let query_bytes = build_edns_query();
+
+    let fast_query = fast_path::parse_query(&query_bytes)
+        .expect("Minimal EDNS query should be fast-path parseable");
+
+    assert!(
+        fast_query.has_edns,
+        "FastPathQuery.has_edns must be true when query contains OPT record"
+    );
+
+    let addresses: Vec<IpAddr> = vec!["1.2.3.4".parse().unwrap()];
+
+    let (wire, wire_len) =
+        wire_response::build_cache_hit_response(&fast_query, &query_bytes, &addresses, 300)
+            .expect("build_cache_hit_response should succeed");
+
+    // ARCOUNT is at bytes 10-11 of the DNS header (big-endian u16)
+    let arcount = u16::from_be_bytes([wire[10], wire[11]]);
+    assert_eq!(arcount, 1, "ARCOUNT must be 1 when OPT record is included (RFC 6891 §6.1.1)");
+
+    // The last 11 bytes should be the OPT record
+    let opt_start = wire_len - 11;
+    assert_eq!(wire[opt_start], 0x00, "OPT NAME must be root (0x00)");
+    assert_eq!(
+        u16::from_be_bytes([wire[opt_start + 1], wire[opt_start + 2]]),
+        41,
+        "OPT TYPE must be 41"
+    );
+}
+
+#[test]
+fn test_fast_path_response_no_opt_when_client_has_no_edns() {
+    // Hand-craft a minimal DNS query WITHOUT OPT record:
+    // Header: QDCOUNT=1, all others 0, ARCOUNT=0
+    // QNAME: \x06google\x03com\x00, QTYPE=A, QCLASS=IN
+    let mut query_bytes: Vec<u8> = vec![
+        0x00, 0x01, // ID
+        0x00, 0x00, // FLAGS (standard query)
+        0x00, 0x01, // QDCOUNT = 1
+        0x00, 0x00, // ANCOUNT = 0
+        0x00, 0x00, // NSCOUNT = 0
+        0x00, 0x00, // ARCOUNT = 0 (no OPT)
+        // QNAME: google.com.
+        0x06, b'g', b'o', b'o', b'g', b'l', b'e',
+        0x03, b'c', b'o', b'm',
+        0x00,
+        // QTYPE A, QCLASS IN
+        0x00, 0x01, 0x00, 0x01,
+    ];
+    // Ensure buffer is large enough
+    query_bytes.resize(query_bytes.len(), 0);
+
+    let fast_query = fast_path::parse_query(&query_bytes)
+        .expect("Minimal query should be fast-path parseable");
+
+    assert!(
+        !fast_query.has_edns,
+        "FastPathQuery.has_edns must be false when no OPT record is present"
+    );
+
+    let addresses: Vec<IpAddr> = vec!["1.2.3.4".parse().unwrap()];
+    let (wire, _wire_len) =
+        wire_response::build_cache_hit_response(&fast_query, &query_bytes, &addresses, 300)
+            .expect("build_cache_hit_response should succeed");
+
+    let arcount = u16::from_be_bytes([wire[10], wire[11]]);
+    assert_eq!(arcount, 0, "ARCOUNT must be 0 when client did not send OPT");
 }
