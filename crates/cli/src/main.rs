@@ -171,7 +171,7 @@ async fn async_main() -> anyhow::Result<()> {
         .parse()
         .expect("Invalid address");
 
-    server::start_web_server(web_addr, app_state).await?;
+    server::start_web_server(web_addr, app_state, &config.server.cors_allowed_origins).await?;
 
     info!("Server shutdown complete");
     Ok(())
