@@ -1,5 +1,5 @@
 use super::super::cache::key::CacheKey;
-use super::super::cache::{CachedData, DnsCache, DnssecStatus, NegativeQueryTracker};
+use super::super::cache::{CachedData, DnsCacheAccess, DnssecStatus, NegativeQueryTracker};
 use super::super::prefetch::PrefetchPredictor;
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -14,7 +14,7 @@ type InflightSender = Arc<watch::Sender<Option<Arc<DnsResolution>>>>;
 
 pub struct CachedResolver {
     inner: Arc<dyn DnsResolver>,
-    cache: Arc<DnsCache>,
+    cache: Arc<dyn DnsCacheAccess>,
     cache_ttl: u32,
     negative_ttl_tracker: Arc<NegativeQueryTracker>,
     prefetch_predictor: Option<Arc<PrefetchPredictor>>,
@@ -22,12 +22,17 @@ pub struct CachedResolver {
 }
 
 impl CachedResolver {
-    pub fn new(inner: Arc<dyn DnsResolver>, cache: Arc<DnsCache>, cache_ttl: u32) -> Self {
+    pub fn new(
+        inner: Arc<dyn DnsResolver>,
+        cache: Arc<dyn DnsCacheAccess>,
+        cache_ttl: u32,
+        negative_ttl_tracker: Arc<NegativeQueryTracker>,
+    ) -> Self {
         Self {
             inner,
             cache,
             cache_ttl,
-            negative_ttl_tracker: Arc::new(NegativeQueryTracker::new()),
+            negative_ttl_tracker,
             prefetch_predictor: None,
             inflight: Arc::new(DashMap::with_hasher(FxBuildHasher)),
         }

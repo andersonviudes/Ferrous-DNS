@@ -4,6 +4,7 @@ use super::eviction::{ActiveEvictionPolicy, EvictionStrategy};
 use super::key::{BorrowedKey, CacheKey};
 use super::l1::{l1_get, l1_insert};
 use super::negative_cache::NegativeDnsCache;
+use super::port::DnsCacheAccess;
 use super::{CacheMetrics, CachedData, CachedRecord, DnssecStatus};
 use dashmap::DashMap;
 use ferrous_dns_domain::RecordType;
@@ -451,5 +452,26 @@ impl DnsCache {
     #[inline(always)]
     pub(super) fn compute_score(&self, record: &CachedRecord, now_secs: u64) -> f64 {
         self.eviction_policy.compute_score(record, now_secs)
+    }
+}
+
+impl DnsCacheAccess for DnsCache {
+    fn get(
+        &self,
+        domain: &Arc<str>,
+        record_type: &RecordType,
+    ) -> Option<(CachedData, Option<DnssecStatus>, Option<u32>)> {
+        DnsCache::get(self, domain, record_type)
+    }
+
+    fn insert(
+        &self,
+        domain: &str,
+        record_type: RecordType,
+        data: CachedData,
+        ttl: u32,
+        dnssec_status: Option<DnssecStatus>,
+    ) {
+        DnsCache::insert(self, domain, record_type, data, ttl, dnssec_status);
     }
 }
