@@ -221,7 +221,9 @@ impl CachedResolver {
             }
             Err(_) => {
                 self.insert_negative(query);
-                self.inflight.remove(&key);
+                if let Some((_, tx)) = self.inflight.remove(&key) {
+                    let _ = tx.send(None);
+                }
             }
         }
 
