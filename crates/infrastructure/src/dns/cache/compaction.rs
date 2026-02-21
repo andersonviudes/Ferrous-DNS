@@ -32,10 +32,6 @@ impl DnsCache {
         removed
     }
 
-    pub fn cleanup_expired(&self) -> usize {
-        self.compact()
-    }
-
     pub fn compaction_count(&self) -> usize {
         self.compaction_counter.load(AtomicOrdering::Relaxed)
     }
