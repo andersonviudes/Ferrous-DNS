@@ -184,7 +184,7 @@ impl HandleDnsQueryUseCase {
                 ..Self::base_query_log(request, start.elapsed().as_micros() as u64, group_id)
             };
 
-            if let Err(e) = self.query_log.log_query(&query_log).await {
+            if let Err(e) = self.query_log.log_query_sync(&query_log) {
                 tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log blocked query");
             }
 
@@ -200,7 +200,7 @@ impl HandleDnsQueryUseCase {
                     ..Self::base_query_log(request, start.elapsed().as_micros() as u64, group_id)
                 };
 
-                if let Err(e) = self.query_log.log_query(&query_log).await {
+                if let Err(e) = self.query_log.log_query_sync(&query_log) {
                     tracing::warn!(error = %e, domain = %query_log.domain, "Failed to log query");
                 }
 
@@ -218,7 +218,7 @@ impl HandleDnsQueryUseCase {
                     ..Self::base_query_log(request, start.elapsed().as_micros() as u64, group_id)
                 };
 
-                if let Err(log_err) = self.query_log.log_query(&query_log).await {
+                if let Err(log_err) = self.query_log.log_query_sync(&query_log) {
                     tracing::warn!(error = %log_err, "Failed to log error query");
                 }
 
