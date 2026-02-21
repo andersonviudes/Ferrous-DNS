@@ -83,6 +83,13 @@ impl CacheUpdater {
         coarse_clock::tick();
         debug!("Starting cache update cycle");
 
+        if cache
+            .eviction_pending
+            .swap(false, std::sync::atomic::Ordering::Relaxed)
+        {
+            cache.evict_entries();
+        }
+
         let candidates = cache.get_refresh_candidates();
 
         if candidates.is_empty() {

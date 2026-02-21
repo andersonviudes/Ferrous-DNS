@@ -8,7 +8,7 @@ use super::{CacheMetrics, CachedData, CachedRecord, DnssecStatus};
 use dashmap::DashMap;
 use ferrous_dns_domain::RecordType;
 use rustc_hash::FxBuildHasher;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -42,6 +42,7 @@ pub struct DnsCache {
     pub(super) access_window_secs: u64,
     pub(super) eviction_sample_size: usize,
     pub(super) negative: NegativeDnsCache,
+    pub(crate) eviction_pending: AtomicBool,
 }
 
 impl DnsCache {
@@ -84,6 +85,7 @@ impl DnsCache {
             access_window_secs: config.access_window_secs,
             eviction_sample_size: config.eviction_sample_size.max(1),
             negative: NegativeDnsCache::new(config.max_entries),
+            eviction_pending: AtomicBool::new(false),
         }
     }
 
@@ -172,7 +174,7 @@ impl DnsCache {
         let key = CacheKey::new(domain, record_type);
 
         if self.cache.len() >= self.max_entries {
-            self.evict_entries();
+            self.eviction_pending.store(true, AtomicOrdering::Relaxed);
         }
 
         let maybe_l1 = if let CachedData::IpAddresses(ref addr) = data {
@@ -351,7 +353,7 @@ impl DnsCache {
         }
     }
 
-    fn evict_entries(&self) {
+    pub fn evict_entries(&self) {
         let num_to_evict = ((self.max_entries as f64) * self.batch_eviction_percentage) as usize;
         let num_to_evict = num_to_evict.max(1);
 

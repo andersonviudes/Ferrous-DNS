@@ -79,9 +79,9 @@ mod tests {
         coarse_clock::tick();
         cache.insert("a.com", RecordType::A, make_ip_data("1.1.1.1"), 300, None);
         cache.insert("b.com", RecordType::A, make_ip_data("2.2.2.2"), 300, None);
-        // Inserir acima do limite — eviction deve ocorrer
         cache.insert("c.com", RecordType::A, make_ip_data("3.3.3.3"), 300, None);
         cache.insert("d.com", RecordType::A, make_ip_data("4.4.4.4"), 300, None);
+        cache.evict_entries();
 
         assert!(cache.len() <= 3, "Cache deve respeitar max_entries");
         let metrics = cache.metrics();
