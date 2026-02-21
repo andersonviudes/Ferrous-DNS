@@ -28,7 +28,6 @@ mod tests {
             CachedData::IpAddresses(Arc::new(vec!["1.1.1.1".parse::<IpAddr>().unwrap()])),
             300,
             RecordType::A,
-            false,
             Some(DnssecStatus::Unknown),
         );
         for _ in 0..hits {
@@ -75,7 +74,6 @@ mod tests {
         let policy = HitRatePolicy;
         let record = make_record(0);
         let score = policy.compute_score(&record, 0);
-        // 0 / (0 + 1) = 0.0
         assert_eq!(score, 0.0);
     }
 }

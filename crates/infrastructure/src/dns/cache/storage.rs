@@ -173,8 +173,7 @@ impl DnsCache {
             None
         };
 
-        let use_lfuk = self.eviction_policy.uses_access_history();
-        let record = CachedRecord::new(data, ttl, record_type, use_lfuk, dnssec_status);
+        let record = CachedRecord::new(data, ttl, record_type, dnssec_status);
         let expires_secs = record.expires_at_secs;
 
         match self.cache.entry(key) {

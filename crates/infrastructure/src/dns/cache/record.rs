@@ -1,18 +1,13 @@
 use super::coarse_clock::coarse_now_secs;
 use super::data::{CachedData, DnssecStatus};
 use ferrous_dns_domain::RecordType;
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
-use std::sync::RwLock;
-use std::time::Instant;
 
 #[derive(Debug)]
 pub struct CachedRecord {
     pub data: CachedData,
     pub dnssec_status: DnssecStatus,
-    /// Expiry as a coarse Unix timestamp (seconds).  Avoids `Instant::now()`
-    /// in the read hot path — coarse_now_secs() is an AtomicU64 load (~3 ns)
-    /// vs a VDSO/syscall call (~20 ns – 2 µs depending on kernel config).
+    /// Expiry as a coarse Unix timestamp (seconds).
     pub expires_at_secs: u64,
     /// Insertion time as a coarse Unix timestamp (seconds).
     pub inserted_at_secs: u64,
@@ -20,9 +15,6 @@ pub struct CachedRecord {
     pub last_access: AtomicU64,
     pub ttl: u32,
     pub record_type: RecordType,
-    /// Per-access timestamps used only by the LFUK eviction scorer.
-    /// Uses `Instant` for sub-second precision in the scoring window.
-    pub access_history: Option<Box<RwLock<VecDeque<Instant>>>>,
     pub marked_for_deletion: AtomicBool,
     pub refreshing: AtomicBool,
     pub permanent: bool,
@@ -30,12 +22,6 @@ pub struct CachedRecord {
 
 impl Clone for CachedRecord {
     fn clone(&self) -> Self {
-        let access_history = if self.access_history.is_some() {
-            Some(Box::new(RwLock::new(VecDeque::with_capacity(10))))
-        } else {
-            None
-        };
-
         Self {
             data: self.data.clone(),
             dnssec_status: self.dnssec_status,
@@ -45,7 +31,6 @@ impl Clone for CachedRecord {
             last_access: AtomicU64::new(self.last_access.load(AtomicOrdering::Relaxed)),
             ttl: self.ttl,
             record_type: self.record_type,
-            access_history,
             marked_for_deletion: AtomicBool::new(
                 self.marked_for_deletion.load(AtomicOrdering::Relaxed),
             ),
@@ -60,16 +45,9 @@ impl CachedRecord {
         data: CachedData,
         ttl: u32,
         record_type: RecordType,
-        use_lfuk: bool,
         dnssec_status: Option<DnssecStatus>,
     ) -> Self {
         let now_secs = coarse_now_secs();
-
-        let access_history = if use_lfuk {
-            Some(Box::new(RwLock::new(VecDeque::with_capacity(10))))
-        } else {
-            None
-        };
 
         Self {
             data,
@@ -80,7 +58,6 @@ impl CachedRecord {
             last_access: AtomicU64::new(now_secs),
             ttl,
             record_type,
-            access_history,
             marked_for_deletion: AtomicBool::new(false),
             refreshing: AtomicBool::new(false),
             permanent: false,
@@ -99,7 +76,6 @@ impl CachedRecord {
             last_access: AtomicU64::new(now_secs),
             ttl,
             record_type,
-            access_history: None,
             marked_for_deletion: AtomicBool::new(false),
             refreshing: AtomicBool::new(false),
             permanent: true,
@@ -180,27 +156,4 @@ impl CachedRecord {
         }
     }
 
-    pub fn lfuk_score(&self) -> f64 {
-        if let Some(ref history) = self.access_history {
-            if let Ok(hist) = history.try_read() {
-                if hist.len() < 2 {
-                    return 0.0;
-                }
-
-                let oldest = hist.front().unwrap();
-                let newest = hist.back().unwrap();
-                let timespan = newest.duration_since(*oldest).as_secs_f64();
-
-                if timespan > 0.0 {
-                    hist.len() as f64 / timespan
-                } else {
-                    hist.len() as f64
-                }
-            } else {
-                self.hit_rate()
-            }
-        } else {
-            0.0
-        }
-    }
 }

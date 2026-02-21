@@ -17,7 +17,6 @@ impl EvictionPolicy for LfuPolicy {
     fn compute_score(&self, record: &CachedRecord, _now_secs: u64) -> f64 {
         let hits = record.hit_count.load(Ordering::Relaxed);
         if self.min_frequency > 0 && hits < self.min_frequency {
-            // Score negativo indica "abaixo do mínimo" — free-evict elegível
             -(self.min_frequency as f64 - hits as f64)
         } else {
             hits as f64
@@ -42,7 +41,6 @@ mod tests {
     fn test_lfu_score_below_min_frequency_is_negative() {
         let policy = LfuPolicy { min_frequency: 10 };
 
-        // Simular um record com hit_count = 3 via DnsCache
         let cache = DnsCache::new(DnsCacheConfig {
             max_entries: 10,
             eviction_strategy: EvictionStrategy::LFU,
@@ -66,23 +64,18 @@ mod tests {
             None,
         );
 
-        // 3 hits — abaixo do min_frequency=10
         for _ in 0..3 {
             cache.get(&Arc::from("test.com"), &RecordType::A);
         }
 
-        // Verificar via policy direta que o score seria negativo
-        // Criar um record temporário para teste
         use crate::dns::cache::data::CachedData as CD;
         use crate::dns::cache::data::DnssecStatus;
         let record = CachedRecord::new(
             CD::IpAddresses(Arc::new(vec!["1.1.1.1".parse::<IpAddr>().unwrap()])),
             300,
             RecordType::A,
-            false,
             Some(DnssecStatus::Unknown),
         );
-        // Simular 3 hits
         for _ in 0..3 {
             record.record_hit();
         }
@@ -110,7 +103,6 @@ mod tests {
             CD::IpAddresses(Arc::new(vec!["1.1.1.1".parse::<IpAddr>().unwrap()])),
             300,
             RecordType::A,
-            false,
             Some(DnssecStatus::Unknown),
         );
         for _ in 0..15 {
@@ -135,7 +127,6 @@ mod tests {
             CD::IpAddresses(Arc::new(vec!["1.1.1.1".parse::<IpAddr>().unwrap()])),
             300,
             RecordType::A,
-            false,
             Some(DnssecStatus::Unknown),
         );
         for _ in 0..7 {

@@ -33,10 +33,6 @@ impl EvictionPolicy for LfukPolicy {
             score
         }
     }
-
-    fn uses_access_history(&self) -> bool {
-        true
-    }
 }
 
 #[cfg(test)]
@@ -52,24 +48,12 @@ mod tests {
             CachedData::IpAddresses(Arc::new(vec!["1.1.1.1".parse::<IpAddr>().unwrap()])),
             300,
             RecordType::A,
-            true,
             Some(DnssecStatus::Unknown),
         );
         for _ in 0..hits {
             record.record_hit();
         }
         record
-    }
-
-    #[test]
-    fn test_lfuk_uses_access_history() {
-        let policy = LfukPolicy {
-            min_lfuk_score: 0.0,
-        };
-        assert!(
-            policy.uses_access_history(),
-            "LFUK deve usar access_history"
-        );
     }
 
     #[test]
