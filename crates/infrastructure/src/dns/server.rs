@@ -40,11 +40,7 @@ impl DnsServerHandler {
     /// the response back to wire bytes.
     ///
     /// Returns `None` only when the packet cannot be parsed at all.
-    pub async fn handle_raw_udp_fallback(
-        &self,
-        raw: &[u8],
-        client_ip: IpAddr,
-    ) -> Option<Vec<u8>> {
+    pub async fn handle_raw_udp_fallback(&self, raw: &[u8], client_ip: IpAddr) -> Option<Vec<u8>> {
         let query_msg = Message::from_vec(raw).ok()?;
 
         // Clone the query section so we can drop query_msg before the .await.
@@ -65,10 +61,20 @@ impl DnsServerHandler {
         let resolution = match self.use_case.execute(&dns_request).await {
             Ok(res) => res,
             Err(DomainError::Blocked) => {
-                return Some(build_error_wire(query_id, rd, &queries, ResponseCode::Refused))
+                return Some(build_error_wire(
+                    query_id,
+                    rd,
+                    &queries,
+                    ResponseCode::Refused,
+                ))
             }
             Err(_) => {
-                return Some(build_error_wire(query_id, rd, &queries, ResponseCode::ServFail))
+                return Some(build_error_wire(
+                    query_id,
+                    rd,
+                    &queries,
+                    ResponseCode::ServFail,
+                ))
             }
         };
 

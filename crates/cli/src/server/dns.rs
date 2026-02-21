@@ -46,7 +46,10 @@ pub async fn start_dns_server(bind_addr: String, handler: DnsServerHandler) -> a
         });
     }
 
-    info!("DNS server ready — {} workers on {}", num_workers, socket_addr);
+    info!(
+        "DNS server ready — {} workers on {}",
+        num_workers, socket_addr
+    );
 
     while join_set.join_next().await.is_some() {}
     Ok(())
