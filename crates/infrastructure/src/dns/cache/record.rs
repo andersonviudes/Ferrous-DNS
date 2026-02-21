@@ -3,6 +3,32 @@ use super::data::{CachedData, DnssecStatus};
 use ferrous_dns_domain::RecordType;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 
+#[repr(C, align(64))]
+pub struct HotCounters {
+    pub hit_count: AtomicU64,
+    pub last_access: AtomicU64,
+    _pad: [u8; 48],
+}
+
+impl HotCounters {
+    fn new(now_secs: u64) -> Self {
+        Self {
+            hit_count: AtomicU64::new(0),
+            last_access: AtomicU64::new(now_secs),
+            _pad: [0u8; 48],
+        }
+    }
+}
+
+impl std::fmt::Debug for HotCounters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HotCounters")
+            .field("hit_count", &self.hit_count.load(AtomicOrdering::Relaxed))
+            .field("last_access", &self.last_access.load(AtomicOrdering::Relaxed))
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub struct CachedRecord {
     pub data: CachedData,
@@ -11,8 +37,7 @@ pub struct CachedRecord {
     pub expires_at_secs: u64,
     /// Insertion time as a coarse Unix timestamp (seconds).
     pub inserted_at_secs: u64,
-    pub hit_count: AtomicU64,
-    pub last_access: AtomicU64,
+    pub counters: HotCounters,
     pub ttl: u32,
     pub record_type: RecordType,
     pub marked_for_deletion: AtomicBool,
@@ -27,8 +52,15 @@ impl Clone for CachedRecord {
             dnssec_status: self.dnssec_status,
             expires_at_secs: self.expires_at_secs,
             inserted_at_secs: self.inserted_at_secs,
-            hit_count: AtomicU64::new(self.hit_count.load(AtomicOrdering::Relaxed)),
-            last_access: AtomicU64::new(self.last_access.load(AtomicOrdering::Relaxed)),
+            counters: HotCounters {
+                hit_count: AtomicU64::new(
+                    self.counters.hit_count.load(AtomicOrdering::Relaxed),
+                ),
+                last_access: AtomicU64::new(
+                    self.counters.last_access.load(AtomicOrdering::Relaxed),
+                ),
+                _pad: [0u8; 48],
+            },
             ttl: self.ttl,
             record_type: self.record_type,
             marked_for_deletion: AtomicBool::new(
@@ -54,8 +86,7 @@ impl CachedRecord {
             dnssec_status: dnssec_status.unwrap_or(DnssecStatus::Unknown),
             expires_at_secs: now_secs + ttl as u64,
             inserted_at_secs: now_secs,
-            hit_count: AtomicU64::new(0),
-            last_access: AtomicU64::new(now_secs),
+            counters: HotCounters::new(now_secs),
             ttl,
             record_type,
             marked_for_deletion: AtomicBool::new(false),
@@ -72,8 +103,7 @@ impl CachedRecord {
             dnssec_status: DnssecStatus::Unknown,
             expires_at_secs: u64::MAX,
             inserted_at_secs: now_secs,
-            hit_count: AtomicU64::new(0),
-            last_access: AtomicU64::new(now_secs),
+            counters: HotCounters::new(now_secs),
             ttl,
             record_type,
             marked_for_deletion: AtomicBool::new(false),
@@ -138,15 +168,17 @@ impl CachedRecord {
 
     #[inline(always)]
     pub fn record_hit(&self) {
-        self.hit_count.fetch_add(1, AtomicOrdering::Relaxed);
-        self.last_access.store(
+        self.counters
+            .hit_count
+            .fetch_add(1, AtomicOrdering::Relaxed);
+        self.counters.last_access.store(
             super::coarse_clock::coarse_now_secs(),
             AtomicOrdering::Relaxed,
         );
     }
 
     pub fn hit_rate(&self) -> f64 {
-        let hits = self.hit_count.load(AtomicOrdering::Relaxed) as f64;
+        let hits = self.counters.hit_count.load(AtomicOrdering::Relaxed) as f64;
         let age_secs = coarse_now_secs().saturating_sub(self.inserted_at_secs) as f64;
 
         if age_secs > 0.0 {

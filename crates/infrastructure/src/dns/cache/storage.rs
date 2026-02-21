@@ -379,8 +379,8 @@ impl DnsCache {
             }
 
             if record.is_expired_at_secs(now_secs) {
-                let hit_count = record.hit_count.load(AtomicOrdering::Relaxed);
-                let last_access = record.last_access.load(AtomicOrdering::Relaxed);
+                let hit_count = record.counters.hit_count.load(AtomicOrdering::Relaxed);
+                let last_access = record.counters.last_access.load(AtomicOrdering::Relaxed);
                 let within_window = hit_count > 0
                     && now_secs.saturating_sub(last_access) <= self.access_window_secs;
 

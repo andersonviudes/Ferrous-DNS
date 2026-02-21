@@ -10,7 +10,7 @@ pub struct HitRatePolicy;
 
 impl EvictionPolicy for HitRatePolicy {
     fn compute_score(&self, record: &CachedRecord, _now_secs: u64) -> f64 {
-        let hits = record.hit_count.load(Ordering::Relaxed);
+        let hits = record.counters.hit_count.load(Ordering::Relaxed);
         (hits as f64) / (hits + 1) as f64
     }
 }

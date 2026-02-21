@@ -15,7 +15,7 @@ pub struct LfuPolicy {
 
 impl EvictionPolicy for LfuPolicy {
     fn compute_score(&self, record: &CachedRecord, _now_secs: u64) -> f64 {
-        let hits = record.hit_count.load(Ordering::Relaxed);
+        let hits = record.counters.hit_count.load(Ordering::Relaxed);
         if self.min_frequency > 0 && hits < self.min_frequency {
             -(self.min_frequency as f64 - hits as f64)
         } else {
