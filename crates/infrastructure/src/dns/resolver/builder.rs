@@ -100,6 +100,7 @@ impl ResolverBuilder {
 
         if let Some(cache) = self.cache {
             let tracker = Arc::new(NegativeQueryTracker::new());
+            tracker.start_cleanup_task();
             let mut cached = CachedResolver::new(resolver, cache, self.config.cache_ttl, tracker);
 
             if let Some(predictor) = self.prefetch_predictor {
