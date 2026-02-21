@@ -276,8 +276,7 @@ fn synthesize_negative_soa(domain: &str, negative_ttl: u32) -> Vec<Record> {
         Ok(n) => n,
         Err(_) => return vec![],
     };
-    let mname =
-        Name::from_str(&format!("ns1.{}", zone)).unwrap_or_else(|_| zone_name.clone());
+    let mname = Name::from_str(&format!("ns1.{}", zone)).unwrap_or_else(|_| zone_name.clone());
     let rname =
         Name::from_str(&format!("hostmaster.{}", zone)).unwrap_or_else(|_| zone_name.clone());
 

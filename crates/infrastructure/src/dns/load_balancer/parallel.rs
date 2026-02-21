@@ -54,8 +54,14 @@ impl ParallelStrategy {
             // when their sockets are ready. Cancellation of the losing upstreams is
             // implicit: dropping `futs` when we return cancels the pending futures.
             futs.push(async move {
-                query_server(&protocol, &domain, &record_type, per_server_timeout_ms, &emitter)
-                    .await
+                query_server(
+                    &protocol,
+                    &domain,
+                    &record_type,
+                    per_server_timeout_ms,
+                    &emitter,
+                )
+                .await
             });
         }
 

@@ -825,7 +825,10 @@ fn test_clear_also_clears_l1_cache() {
 
     // Segundo get deve vir do L1 (IpAddresses)
     let from_l1 = cache.get(&Arc::from("clear-test.com"), &RecordType::A);
-    assert!(from_l1.is_some(), "Entry deve estar no L1 na segunda leitura");
+    assert!(
+        from_l1.is_some(),
+        "Entry deve estar no L1 na segunda leitura"
+    );
 
     cache.clear();
 

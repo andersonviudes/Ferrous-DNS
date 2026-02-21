@@ -208,13 +208,10 @@ fn build_edns_query() -> Vec<u8> {
         0x00, 0x00, // NSCOUNT = 0
         0x00, 0x01, // ARCOUNT = 1 (one OPT record)
         // QNAME: google.com.
-        0x06, b'g', b'o', b'o', b'g', b'l', b'e',
-        0x03, b'c', b'o', b'm',
-        0x00,
+        0x06, b'g', b'o', b'o', b'g', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
         // QTYPE A, QCLASS IN
-        0x00, 0x01, 0x00, 0x01,
-        // OPT RR
-        0x00,       // NAME = root
+        0x00, 0x01, 0x00, 0x01, // OPT RR
+        0x00, // NAME = root
         0x00, 0x29, // TYPE = OPT (41)
         0x10, 0x00, // CLASS = 4096 (client UDP payload size)
         0x00, 0x00, 0x00, 0x00, // TTL: extended RCODE=0, version=0, DO=0, Z=0
@@ -242,7 +239,10 @@ fn test_fast_path_response_includes_opt_when_client_sent_edns() {
 
     // ARCOUNT is at bytes 10-11 of the DNS header (big-endian u16)
     let arcount = u16::from_be_bytes([wire[10], wire[11]]);
-    assert_eq!(arcount, 1, "ARCOUNT must be 1 when OPT record is included (RFC 6891 §6.1.1)");
+    assert_eq!(
+        arcount, 1,
+        "ARCOUNT must be 1 when OPT record is included (RFC 6891 §6.1.1)"
+    );
 
     // The last 11 bytes should be the OPT record
     let opt_start = wire_len - 11;
@@ -284,9 +284,11 @@ fn test_health_checker_consecutive_failures_does_not_overflow() {
 #[test]
 fn test_transport_error_classification_typed_variants() {
     // Typed variants must be classified as transport errors without string matching.
-    assert!(ResponseParser::is_transport_error(&DomainError::TransportTimeout {
-        server: "8.8.8.8:53".into()
-    }));
+    assert!(ResponseParser::is_transport_error(
+        &DomainError::TransportTimeout {
+            server: "8.8.8.8:53".into()
+        }
+    ));
     assert!(ResponseParser::is_transport_error(
         &DomainError::TransportConnectionRefused {
             server: "1.1.1.1:53".into()
@@ -322,17 +324,15 @@ fn test_fast_path_response_no_opt_when_client_has_no_edns() {
         0x00, 0x00, // NSCOUNT = 0
         0x00, 0x00, // ARCOUNT = 0 (no OPT)
         // QNAME: google.com.
-        0x06, b'g', b'o', b'o', b'g', b'l', b'e',
-        0x03, b'c', b'o', b'm',
-        0x00,
+        0x06, b'g', b'o', b'o', b'g', b'l', b'e', 0x03, b'c', b'o', b'm', 0x00,
         // QTYPE A, QCLASS IN
         0x00, 0x01, 0x00, 0x01,
     ];
     // Ensure buffer is large enough
     query_bytes.resize(query_bytes.len(), 0);
 
-    let fast_query = fast_path::parse_query(&query_bytes)
-        .expect("Minimal query should be fast-path parseable");
+    let fast_query =
+        fast_path::parse_query(&query_bytes).expect("Minimal query should be fast-path parseable");
 
     assert!(
         !fast_query.has_edns,
