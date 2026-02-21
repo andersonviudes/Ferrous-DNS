@@ -156,6 +156,7 @@ async fn async_main() -> anyhow::Result<()> {
         create_regex_filter: use_cases.create_regex_filter,
         update_regex_filter: use_cases.update_regex_filter,
         delete_regex_filter: use_cases.delete_regex_filter,
+        api_key: config.server.api_key.as_deref().map(Arc::from),
     };
 
     let dns_addr = format!("{}:{}", config.server.bind_address, config.server.dns_port);
