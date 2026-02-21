@@ -36,6 +36,25 @@ fn validate_response_id(
     Ok(())
 }
 
+fn validate_response_source(
+    from: SocketAddr,
+    expected: SocketAddr,
+) -> Result<(), DomainError> {
+    if from.ip() != expected.ip() {
+        warn!(
+            expected = %expected.ip(),
+            actual = %from.ip(),
+            "Rejecting UDP response from unexpected source (anti-spoofing)"
+        );
+        return Err(DomainError::InvalidDomainName(format!(
+            "UDP response from unexpected source: expected {}, got {}",
+            expected.ip(),
+            from.ip()
+        )));
+    }
+    Ok(())
+}
+
 const MAX_UDP_RESPONSE_SIZE: usize = 4096;
 
 pub struct UdpTransport {
@@ -111,14 +130,7 @@ impl UdpTransport {
                         ))
                     })?;
 
-            if from_addr.ip() != self.server_addr.ip() {
-                warn!(
-                    expected = %self.server_addr,
-                    received_from = %from_addr,
-                    "UDP response from unexpected source"
-                );
-            }
-
+            validate_response_source(from_addr, self.server_addr)?;
             validate_response_id(message_bytes, &recv_buf[..bytes_received], self.server_addr)?;
 
             debug!(
@@ -193,14 +205,7 @@ impl UdpTransport {
                     ))
                 })?;
 
-        if from_addr.ip() != self.server_addr.ip() {
-            warn!(
-                expected = %self.server_addr,
-                received_from = %from_addr,
-                "UDP response from unexpected source"
-            );
-        }
-
+        validate_response_source(from_addr, self.server_addr)?;
         validate_response_id(message_bytes, &recv_buf[..bytes_received], self.server_addr)?;
 
         debug!(
