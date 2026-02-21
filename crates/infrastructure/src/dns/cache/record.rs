@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU64, AtomicU8, Ordering as AtomicOrdering};
 const FLAG_DELETED: u8 = 0b001;
 const FLAG_REFRESHING: u8 = 0b010;
 const FLAG_PERMANENT: u8 = 0b100;
+const STALE_GRACE_PERIOD_MULTIPLIER: u64 = 2;
 
 #[repr(C, align(64))]
 pub struct HotCounters {
@@ -133,7 +134,7 @@ impl CachedRecord {
     pub fn is_stale_usable(&self) -> bool {
         let now_secs = coarse_now_secs();
         let age = now_secs.saturating_sub(self.inserted_at_secs);
-        let max_stale_age = (self.ttl as u64) * 2;
+        let max_stale_age = (self.ttl as u64) * STALE_GRACE_PERIOD_MULTIPLIER;
 
         now_secs >= self.expires_at_secs && age < max_stale_age
     }
@@ -143,7 +144,7 @@ impl CachedRecord {
     #[inline(always)]
     pub fn is_stale_usable_at_secs(&self, now_secs: u64) -> bool {
         let age = now_secs.saturating_sub(self.inserted_at_secs);
-        let max_stale_age = (self.ttl as u64) * 2;
+        let max_stale_age = (self.ttl as u64) * STALE_GRACE_PERIOD_MULTIPLIER;
 
         now_secs >= self.expires_at_secs && age < max_stale_age
     }

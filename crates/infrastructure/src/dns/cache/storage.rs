@@ -12,6 +12,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering as AtomicOr
 use std::sync::Arc;
 use tracing::{debug, info};
 
+const BLOOM_TARGET_FP_RATE: f64 = 0.01;
+const PERMANENT_TTL_SECS: u32 = 365 * 24 * 60 * 60;
+
 pub struct DnsCacheConfig {
     pub max_entries: usize,
     pub eviction_strategy: EvictionStrategy,
@@ -70,7 +73,7 @@ impl DnsCache {
             FxBuildHasher,
             config.shard_amount,
         );
-        let bloom = AtomicBloom::new(config.max_entries * 2, 0.01);
+        let bloom = AtomicBloom::new(config.max_entries * 2, BLOOM_TARGET_FP_RATE);
 
         Self {
             cache: Arc::new(cache),
@@ -234,7 +237,7 @@ impl DnsCache {
             None
         };
 
-        let record = CachedRecord::permanent(data, 365 * 24 * 60 * 60, record_type);
+        let record = CachedRecord::permanent(data, PERMANENT_TTL_SECS, record_type);
         self.cache.insert(key, record);
 
         if let Some(addresses) = maybe_l1 {

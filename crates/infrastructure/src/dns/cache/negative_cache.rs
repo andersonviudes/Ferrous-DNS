@@ -4,6 +4,9 @@ use dashmap::DashMap;
 use ferrous_dns_domain::RecordType;
 use rustc_hash::FxBuildHasher;
 
+const MAX_ENTRIES_CAP: usize = 65_536;
+const EVICTION_BATCH_SIZE: usize = 64;
+
 struct NegativeEntry {
     expires_at_secs: u64,
 }
@@ -23,7 +26,7 @@ pub struct NegativeDnsCache {
 impl NegativeDnsCache {
     pub fn new(max_entries: usize) -> Self {
         Self {
-            cache: DashMap::with_capacity_and_hasher(max_entries.min(65536), FxBuildHasher),
+            cache: DashMap::with_capacity_and_hasher(max_entries.min(MAX_ENTRIES_CAP), FxBuildHasher),
             max_entries,
         }
     }
@@ -53,7 +56,7 @@ impl NegativeDnsCache {
                 .iter()
                 .filter(|e| now >= e.value().expires_at_secs)
                 .map(|e| e.key().clone())
-                .take(64)
+                .take(EVICTION_BATCH_SIZE)
                 .collect();
             for k in &expired {
                 self.cache.remove(k);

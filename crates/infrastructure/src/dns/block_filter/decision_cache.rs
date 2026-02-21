@@ -12,6 +12,7 @@ use std::sync::OnceLock;
 const TTL_SECS: u64 = 60;
 const L0_CAPACITY: usize = 256;
 const L1_CAPACITY: usize = 100_000;
+const EVICTION_BATCH_SIZE: usize = 64;
 
 const CACHE_ALLOW: u8 = 0;
 
@@ -124,7 +125,7 @@ impl BlockDecisionCache {
                 .iter()
                 .filter(|e| now.saturating_sub(e.value().1) >= TTL_SECS)
                 .map(|e| *e.key())
-                .take(64)
+                .take(EVICTION_BATCH_SIZE)
                 .collect();
             for k in &expired {
                 self.inner.remove(k);
