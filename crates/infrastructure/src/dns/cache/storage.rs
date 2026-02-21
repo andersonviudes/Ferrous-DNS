@@ -282,6 +282,10 @@ impl DnsCache {
         self.eviction_policy.strategy()
     }
 
+    pub fn rotate_bloom(&self) {
+        self.bloom.rotate();
+    }
+
     pub fn access_window_secs(&self) -> u64 {
         self.access_window_secs
     }

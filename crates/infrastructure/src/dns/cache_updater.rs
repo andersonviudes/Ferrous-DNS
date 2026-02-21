@@ -90,6 +90,8 @@ impl CacheUpdater {
             cache.evict_entries();
         }
 
+        cache.rotate_bloom();
+
         let candidates = cache.get_refresh_candidates();
 
         if candidates.is_empty() {
