@@ -133,7 +133,7 @@ impl DnssecValidator {
 
         let upstream_result = self
             .pool_manager
-            .query(domain, &record_type, self.timeout_ms)
+            .query(domain, &record_type, self.timeout_ms, true)
             .await?;
 
         debug!(
@@ -204,7 +204,7 @@ impl DnssecValidator {
 
         let result = self
             .pool_manager
-            .query(domain, &RecordType::DS, self.timeout_ms)
+            .query(domain, &RecordType::DS, self.timeout_ms, true)
             .await;
 
         match result {

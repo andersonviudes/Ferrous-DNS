@@ -9,14 +9,19 @@ use std::str::FromStr;
 pub struct MessageBuilder;
 
 impl MessageBuilder {
-    pub fn build_query(domain: &str, record_type: &RecordType) -> Result<Vec<u8>, DomainError> {
-        let (_, bytes) = Self::build_query_with_id(domain, record_type)?;
+    pub fn build_query(
+        domain: &str,
+        record_type: &RecordType,
+        dnssec_ok: bool,
+    ) -> Result<Vec<u8>, DomainError> {
+        let (_, bytes) = Self::build_query_with_id(domain, record_type, dnssec_ok)?;
         Ok(bytes)
     }
 
     pub fn build_query_with_id(
         domain: &str,
         record_type: &RecordType,
+        dnssec_ok: bool,
     ) -> Result<(u16, Vec<u8>), DomainError> {
         let name = Name::from_str(domain).map_err(|e| {
             DomainError::InvalidDomainName(format!("Invalid domain '{}': {}", domain, e))
@@ -33,7 +38,7 @@ impl MessageBuilder {
         let mut message = Message::new(id, MessageType::Query, OpCode::Query);
         message.set_recursion_desired(true);
         message.add_query(query);
-        message.set_edns(Self::default_edns());
+        message.set_edns(Self::build_edns(dnssec_ok));
 
         let bytes = Self::serialize_message(&message)?;
         Ok((id, bytes))
@@ -47,10 +52,10 @@ impl MessageBuilder {
             .unwrap_or_else(|_| fastrand::u16(..))
     }
 
-    fn default_edns() -> Edns {
+    fn build_edns(dnssec_ok: bool) -> Edns {
         let mut edns = Edns::new();
         edns.set_max_payload(4096);
-        edns.set_dnssec_ok(true);
+        edns.set_dnssec_ok(dnssec_ok);
         edns.set_version(0);
         edns
     }

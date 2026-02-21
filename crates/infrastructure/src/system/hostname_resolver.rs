@@ -57,7 +57,7 @@ impl HostnameResolver for PtrHostnameResolver {
 
         match self
             .pool_manager
-            .query(&reverse_domain, &RecordType::PTR, timeout_ms)
+            .query(&reverse_domain, &RecordType::PTR, timeout_ms, false)
             .await
         {
             Ok(result) => {

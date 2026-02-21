@@ -21,6 +21,7 @@ impl ParallelStrategy {
         domain: &str,
         record_type: &RecordType,
         timeout_ms: u64,
+        dnssec_ok: bool,
         emitter: &QueryEventEmitter,
     ) -> Result<UpstreamResult, DomainError> {
         if servers.is_empty() {
@@ -55,6 +56,7 @@ impl ParallelStrategy {
                     &domain,
                     &record_type,
                     per_server_timeout_ms,
+                    dnssec_ok,
                     &emitter,
                 )
                 .await

@@ -78,7 +78,7 @@ impl ResolverBuilder {
             "Building DNS resolver"
         );
 
-        let mut core = CoreResolver::new(self.pool_manager.clone(), self.config.query_timeout_ms);
+        let mut core = CoreResolver::new(self.pool_manager.clone(), self.config.query_timeout_ms, self.config.dnssec_enabled);
 
         if let Some(forwarder) = self.conditional_forwarder {
             core = core.with_conditional_forwarder(forwarder);
