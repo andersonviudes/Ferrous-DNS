@@ -267,6 +267,41 @@ impl Config {
         Ok(())
     }
 
+    pub fn save_local_records(&self, path: &str) -> Result<(), ConfigError> {
+        let existing = std::fs::read_to_string(path)
+            .map_err(|e| ConfigError::FileRead(path.to_string(), e.to_string()))?;
+
+        let mut doc = existing
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|e| ConfigError::Parse(format!("Failed to parse config file: {}", e)))?;
+
+        if let Some(dns) = doc.get_mut("dns").and_then(|i| i.as_table_mut()) {
+            if self.dns.local_records.is_empty() {
+                dns.remove("local_records");
+            } else {
+                let mut aot = toml_edit::ArrayOfTables::new();
+                for record in &self.dns.local_records {
+                    let mut table = toml_edit::Table::new();
+                    table.insert("hostname", toml_edit::value(record.hostname.clone()));
+                    if let Some(ref domain) = record.domain {
+                        table.insert("domain", toml_edit::value(domain.clone()));
+                    }
+                    table.insert("ip", toml_edit::value(record.ip.clone()));
+                    table.insert("record_type", toml_edit::value(record.record_type.clone()));
+                    if let Some(ttl) = record.ttl {
+                        table.insert("ttl", toml_edit::value(ttl as i64));
+                    }
+                    aot.push(table);
+                }
+                dns.insert("local_records", toml_edit::Item::ArrayOfTables(aot));
+            }
+        }
+
+        std::fs::write(path, doc.to_string())
+            .map_err(|e| ConfigError::FileWrite(path.to_string(), e.to_string()))?;
+        Ok(())
+    }
+
     pub fn get_config_path() -> Option<String> {
         if std::path::Path::new("ferrous-dns.toml").exists() {
             Some("ferrous-dns.toml".to_string())
