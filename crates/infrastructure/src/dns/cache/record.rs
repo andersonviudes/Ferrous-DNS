@@ -1,7 +1,11 @@
 use super::coarse_clock::coarse_now_secs;
 use super::data::{CachedData, DnssecStatus};
 use ferrous_dns_domain::RecordType;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering as AtomicOrdering};
+
+const FLAG_DELETED: u8 = 0b001;
+const FLAG_REFRESHING: u8 = 0b010;
+const FLAG_PERMANENT: u8 = 0b100;
 
 #[repr(C, align(64))]
 pub struct HotCounters {
@@ -40,9 +44,7 @@ pub struct CachedRecord {
     pub counters: HotCounters,
     pub ttl: u32,
     pub record_type: RecordType,
-    pub marked_for_deletion: AtomicBool,
-    pub refreshing: AtomicBool,
-    pub permanent: bool,
+    pub flags: AtomicU8,
 }
 
 impl Clone for CachedRecord {
@@ -63,11 +65,7 @@ impl Clone for CachedRecord {
             },
             ttl: self.ttl,
             record_type: self.record_type,
-            marked_for_deletion: AtomicBool::new(
-                self.marked_for_deletion.load(AtomicOrdering::Relaxed),
-            ),
-            refreshing: AtomicBool::new(self.refreshing.load(AtomicOrdering::Relaxed)),
-            permanent: self.permanent,
+            flags: AtomicU8::new(self.flags.load(AtomicOrdering::Relaxed)),
         }
     }
 }
@@ -89,9 +87,7 @@ impl CachedRecord {
             counters: HotCounters::new(now_secs),
             ttl,
             record_type,
-            marked_for_deletion: AtomicBool::new(false),
-            refreshing: AtomicBool::new(false),
-            permanent: false,
+            flags: AtomicU8::new(0),
         }
     }
 
@@ -106,15 +102,18 @@ impl CachedRecord {
             counters: HotCounters::new(now_secs),
             ttl,
             record_type,
-            marked_for_deletion: AtomicBool::new(false),
-            refreshing: AtomicBool::new(false),
-            permanent: true,
+            flags: AtomicU8::new(FLAG_PERMANENT),
         }
     }
 
     #[inline(always)]
+    pub fn is_permanent(&self) -> bool {
+        self.flags.load(AtomicOrdering::Relaxed) & FLAG_PERMANENT != 0
+    }
+
+    #[inline(always)]
     pub fn is_expired(&self) -> bool {
-        if self.permanent {
+        if self.is_permanent() {
             return false;
         }
         coarse_now_secs() >= self.expires_at_secs
@@ -124,7 +123,7 @@ impl CachedRecord {
     /// redundant `coarse_now_secs()` call when the caller already has one.
     #[inline(always)]
     pub fn is_expired_at_secs(&self, now_secs: u64) -> bool {
-        if self.permanent {
+        if self.is_permanent() {
             return false;
         }
         now_secs >= self.expires_at_secs
@@ -150,13 +149,37 @@ impl CachedRecord {
     }
 
     pub fn mark_for_deletion(&self) {
-        self.marked_for_deletion
-            .store(true, AtomicOrdering::Relaxed);
+        self.flags.fetch_or(FLAG_DELETED, AtomicOrdering::Relaxed);
     }
 
     #[inline(always)]
     pub fn is_marked_for_deletion(&self) -> bool {
-        self.marked_for_deletion.load(AtomicOrdering::Relaxed)
+        self.flags.load(AtomicOrdering::Relaxed) & FLAG_DELETED != 0
+    }
+
+    #[inline(always)]
+    pub fn try_set_refreshing(&self) -> bool {
+        let mut current = self.flags.load(AtomicOrdering::Relaxed);
+        loop {
+            if current & FLAG_REFRESHING != 0 {
+                return false;
+            }
+            match self.flags.compare_exchange_weak(
+                current,
+                current | FLAG_REFRESHING,
+                AtomicOrdering::Acquire,
+                AtomicOrdering::Relaxed,
+            ) {
+                Ok(_) => return true,
+                Err(actual) => current = actual,
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn clear_refreshing(&self) {
+        self.flags
+            .fetch_and(!FLAG_REFRESHING, AtomicOrdering::Release);
     }
 
     #[inline(always)]
@@ -187,5 +210,4 @@ impl CachedRecord {
             hits
         }
     }
-
 }

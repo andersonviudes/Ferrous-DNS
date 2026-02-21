@@ -53,17 +53,7 @@ impl DnsCache {
             }
 
             if record.is_expired_at_secs(now) {
-                if record.is_stale_usable_at_secs(now)
-                    && record
-                        .refreshing
-                        .compare_exchange(
-                            false,
-                            true,
-                            AtomicOrdering::Acquire,
-                            AtomicOrdering::Relaxed,
-                        )
-                        .is_ok()
-                {
+                if record.is_stale_usable_at_secs(now) && record.try_set_refreshing() {
                     candidates.push((key.domain.clone(), key.record_type));
                 }
                 continue;
@@ -73,16 +63,7 @@ impl DnsCache {
                 continue;
             }
 
-            if record
-                .refreshing
-                .compare_exchange(
-                    false,
-                    true,
-                    AtomicOrdering::Acquire,
-                    AtomicOrdering::Relaxed,
-                )
-                .is_ok()
-            {
+            if record.try_set_refreshing() {
                 candidates.push((key.domain.clone(), key.record_type));
             }
         }
@@ -95,7 +76,7 @@ impl DnsCache {
 
         let key = CacheKey::new(domain, *record_type);
         if let Some(entry) = self.cache.get(&key) {
-            entry.refreshing.store(false, AtomicOrdering::Release);
+            entry.clear_refreshing();
         }
     }
 }
@@ -233,8 +214,6 @@ mod tests {
     /// Entradas com refreshing=true não são retornadas como candidatos (compare_exchange).
     #[test]
     fn test_refresh_skips_already_refreshing_entries() {
-        use std::sync::atomic::Ordering;
-
         let cache = make_cache_with_window(7200);
         coarse_clock::tick();
 
@@ -250,7 +229,7 @@ mod tests {
         // Simular que já está sendo refreshado
         let key = crate::dns::cache::key::CacheKey::new("refreshing.test", RecordType::CNAME);
         if let Some(entry) = cache.cache.get(&key) {
-            entry.refreshing.store(true, Ordering::Relaxed);
+            entry.try_set_refreshing();
         }
 
         let candidates = cache.get_refresh_candidates();

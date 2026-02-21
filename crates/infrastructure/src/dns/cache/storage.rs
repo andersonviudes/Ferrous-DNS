@@ -125,7 +125,7 @@ impl DnsCache {
             let now_secs = coarse_now_secs();
 
             if record.is_stale_usable_at_secs(now_secs) {
-                record.refreshing.swap(true, AtomicOrdering::Acquire);
+                record.try_set_refreshing();
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
                 return Some((record.data.clone(), Some(record.dnssec_status), Some(0)));
@@ -290,7 +290,7 @@ impl DnsCache {
 
         if let Some(mut entry) = self.cache.get_mut(&key) {
             let record = entry.value_mut();
-            if record.permanent || record.is_marked_for_deletion() {
+            if record.is_permanent() || record.is_marked_for_deletion() {
                 return false;
             }
             let ttl = new_ttl.unwrap_or(record.ttl);
@@ -300,9 +300,7 @@ impl DnsCache {
             if let Some(ds) = dnssec_status {
                 record.dnssec_status = ds;
             }
-            record
-                .refreshing
-                .store(false, std::sync::atomic::Ordering::Relaxed);
+            record.clear_refreshing();
 
             let maybe_addresses = if let CachedData::IpAddresses(ref addr) = new_data {
                 Some(Arc::clone(addr))
