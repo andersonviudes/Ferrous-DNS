@@ -173,7 +173,7 @@
         <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
                 <label style="font-size:14px;font-weight:500;color:var(--text-secondary);white-space:nowrap">Show:</label>
-                <select x-model.number="pageSize" @change="currentPage=1;loadQueries()"
+                <select x-model.number="pageSize" @change="currentPage=1;_cursors={};loadQueries()"
                         style="padding:8px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px">
                     <option value="10">10</option>
                     <option value="25">25</option>
@@ -291,7 +291,7 @@
             theme: 'light',
             queries: [],
             total: 0,
-            pageSize: 50,
+            pageSize: 25,
             currentPage: 1,
             category: '',
             autoRefresh: true,
@@ -299,6 +299,7 @@
             serverStats: null,
             _ctrl: {},
             _pollId: null,
+            _cursors: {},
 
             async init() {
                 this.theme = localStorage.getItem('theme') || 'light';
@@ -323,15 +324,21 @@
                 this._ctrl.queries?.abort();
                 this._ctrl.queries = new AbortController();
                 try {
-                    const offset = (this.currentPage - 1) * this.pageSize;
+                    const cursor = this._cursors[this.currentPage];
+                    const pageParam = cursor
+                        ? `cursor=${cursor}`
+                        : `offset=${(this.currentPage - 1) * this.pageSize}`;
                     const res = await fetch(
-                        `/api/queries?limit=${this.pageSize}&offset=${offset}&period=24h`,
+                        `/api/queries?limit=${this.pageSize}&${pageParam}&period=24h`,
                         {signal: this._ctrl.queries.signal}
                     );
                     if (res.ok) {
                         const result = await res.json();
                         this.queries = result.data || result;
                         this.total = result.total ?? this.queries.length;
+                        if (result.next_cursor != null) {
+                            this._cursors[this.currentPage + 1] = result.next_cursor;
+                        }
                         this.calculateStats();
                     }
                 } catch (e) {
