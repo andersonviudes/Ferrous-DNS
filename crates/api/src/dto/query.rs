@@ -33,6 +33,7 @@ pub struct QueryResponse {
     pub timestamp: String,
     pub domain: String,
     pub client: String,
+    pub client_hostname: Option<String>,
     #[serde(rename = "type")]
     pub record_type: String,
     pub blocked: bool,

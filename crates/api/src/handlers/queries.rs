@@ -38,6 +38,7 @@ pub async fn get_queries(
                     timestamp: q.timestamp.unwrap_or_default(),
                     domain: q.domain.to_string(),
                     client: q.client_ip.to_string(),
+                    client_hostname: q.client_hostname.as_deref().map(|s| s.to_string()),
                     record_type: q.record_type.as_str().to_string(),
                     blocked: q.blocked,
                     response_time_us: q.response_time_us,

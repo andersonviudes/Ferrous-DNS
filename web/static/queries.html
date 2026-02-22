@@ -249,7 +249,8 @@
                     </td>
                     <td class="col-type"><span class="badge" style="background:rgba(59,130,246,0.1);color:#3B82F6"
                               x-text="query.type"></span></td>
-                    <td style="font-size:13px" x-text="query.client"></td>
+                    <td style="font-size:13px"
+                        x-text="query.client_hostname ? query.client_hostname + ' (' + query.client + ')' : query.client"></td>
                     <td>
                         <span class="badge"
                               :style="query.cache_hit

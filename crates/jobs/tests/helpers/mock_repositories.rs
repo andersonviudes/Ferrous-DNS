@@ -422,6 +422,7 @@ impl MockQueryLogRepository {
             domain: "test.example.com".into(),
             record_type: RecordType::A,
             client_ip: ip.parse().unwrap(),
+            client_hostname: None,
             blocked: false,
             response_time_us: Some(10),
             cache_hit: false,

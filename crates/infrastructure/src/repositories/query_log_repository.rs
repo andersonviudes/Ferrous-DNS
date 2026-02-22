@@ -124,6 +124,9 @@ fn row_to_query_log(row: SqliteRow) -> Option<QueryLog> {
         domain: Arc::from(domain_str.as_str()),
         record_type: record_type_str.parse().ok()?,
         client_ip: client_ip_str.parse().ok()?,
+        client_hostname: row
+            .get::<Option<String>, _>("hostname")
+            .map(|s| Arc::from(s.as_str())),
         blocked: row.get::<i64, _>("blocked") != 0,
         response_time_us: row
             .get::<Option<i64>, _>("response_time_ms") // column kept as-is (SQLite no ALTER COLUMN)
@@ -340,12 +343,15 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         );
 
         let rows = sqlx::query(
-            "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id, block_source,
-                    datetime(created_at) as created_at
-             FROM query_log
-             WHERE created_at >= datetime('now', '-' || ? || ' hours')
-               AND query_source = 'client'
-             ORDER BY created_at DESC
+            "SELECT q.id, q.domain, q.record_type, q.client_ip, q.blocked, q.response_time_ms,
+                    q.cache_hit, q.cache_refresh, q.dnssec_status, q.upstream_server,
+                    q.response_status, q.query_source, q.group_id, q.block_source,
+                    datetime(q.created_at) as created_at, c.hostname
+             FROM query_log q
+             LEFT JOIN clients c ON q.client_ip = c.ip_address
+             WHERE q.created_at >= datetime('now', '-' || ? || ' hours')
+               AND q.query_source = 'client'
+             ORDER BY q.created_at DESC
              LIMIT ?",
         )
         .bind(period_hours)
@@ -384,13 +390,16 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         let rows = if let Some(cursor_id) = cursor {
             // Keyset pagination: O(log N) via primary key — no full index scan
             sqlx::query(
-                "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id, block_source,
-                        datetime(created_at) as created_at
-                 FROM query_log
-                 WHERE id < ?
-                   AND query_source = 'client'
-                   AND created_at >= datetime('now', '-' || ? || ' hours')
-                 ORDER BY id DESC
+                "SELECT q.id, q.domain, q.record_type, q.client_ip, q.blocked, q.response_time_ms,
+                        q.cache_hit, q.cache_refresh, q.dnssec_status, q.upstream_server,
+                        q.response_status, q.query_source, q.group_id, q.block_source,
+                        datetime(q.created_at) as created_at, c.hostname
+                 FROM query_log q
+                 LEFT JOIN clients c ON q.client_ip = c.ip_address
+                 WHERE q.id < ?
+                   AND q.query_source = 'client'
+                   AND q.created_at >= datetime('now', '-' || ? || ' hours')
+                 ORDER BY q.id DESC
                  LIMIT ?",
             )
             .bind(cursor_id)
@@ -401,12 +410,15 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         } else {
             // Offset pagination for the first page (cursor not yet established)
             sqlx::query(
-                "SELECT id, domain, record_type, client_ip, blocked, response_time_ms, cache_hit, cache_refresh, dnssec_status, upstream_server, response_status, query_source, group_id, block_source,
-                        datetime(created_at) as created_at
-                 FROM query_log
-                 WHERE created_at >= datetime('now', '-' || ? || ' hours')
-                   AND query_source = 'client'
-                 ORDER BY created_at DESC
+                "SELECT q.id, q.domain, q.record_type, q.client_ip, q.blocked, q.response_time_ms,
+                        q.cache_hit, q.cache_refresh, q.dnssec_status, q.upstream_server,
+                        q.response_status, q.query_source, q.group_id, q.block_source,
+                        datetime(q.created_at) as created_at, c.hostname
+                 FROM query_log q
+                 LEFT JOIN clients c ON q.client_ip = c.ip_address
+                 WHERE q.created_at >= datetime('now', '-' || ? || ' hours')
+                   AND q.query_source = 'client'
+                 ORDER BY q.created_at DESC
                  LIMIT ? OFFSET ?",
             )
             .bind(period_hours)

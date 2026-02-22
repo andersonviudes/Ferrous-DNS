@@ -1245,6 +1245,7 @@ mod tests {
             domain: "test.com".into(),
             record_type: RecordType::A,
             client_ip: IpAddr::from_str("192.168.1.1").unwrap(),
+            client_hostname: None,
             blocked: false,
             response_time_us: Some(10),
             cache_hit: true,

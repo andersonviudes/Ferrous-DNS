@@ -67,6 +67,7 @@ pub struct QueryLog {
     pub domain: Arc<str>,
     pub record_type: RecordType,
     pub client_ip: IpAddr,
+    pub client_hostname: Option<Arc<str>>,
     pub blocked: bool,
     pub response_time_us: Option<u64>,
     pub cache_hit: bool,
