@@ -94,7 +94,11 @@ async fn async_main() -> anyhow::Result<()> {
 
     let repos = di::Repositories::new(write_pool, read_pool, &config.database).await?;
     let dns_services = di::DnsServices::new(&config, &repos).await?;
-    let use_cases = di::UseCases::new(&repos, dns_services.pool_manager.clone());
+    let use_cases = di::UseCases::new(
+        &repos,
+        dns_services.pool_manager.clone(),
+        config.dns.local_dns_server.clone(),
+    );
 
     JobRunner::new()
         .with_client_sync(ClientSyncJob::new(

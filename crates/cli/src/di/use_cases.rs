@@ -62,9 +62,15 @@ pub struct UseCases {
 }
 
 impl UseCases {
-    pub fn new(repos: &Repositories, pool_manager: Arc<PoolManager>) -> Self {
+    pub fn new(
+        repos: &Repositories,
+        pool_manager: Arc<PoolManager>,
+        local_dns_server: Option<String>,
+    ) -> Self {
         let arp_reader = Arc::new(LinuxArpReader::new());
-        let hostname_resolver = Arc::new(PtrHostnameResolver::new(pool_manager, 5));
+        let hostname_resolver = Arc::new(
+            PtrHostnameResolver::new(pool_manager, 5).with_local_dns_server(local_dns_server),
+        );
 
         let subnet_matcher = Arc::new(SubnetMatcherService::new(repos.client_subnet.clone()));
 

@@ -502,6 +502,7 @@ impl QueryLogRepository for MockQueryLogRepository {
             queries_blocked_by_blocklist: 0,
             queries_blocked_by_managed_domain: 0,
             queries_blocked_by_regex_filter: 0,
+            queries_local_dns: 0,
             queries_by_type: HashMap::new(),
             most_queried_type: None,
             record_type_distribution: Vec::new(),

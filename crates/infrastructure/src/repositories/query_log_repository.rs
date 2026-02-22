@@ -88,6 +88,7 @@ fn to_static_response_status(s: &str) -> Option<&'static str> {
         "REFUSED" => Some("REFUSED"),
         "TIMEOUT" => Some("TIMEOUT"),
         "BLOCKED" => Some("BLOCKED"),
+        "LOCAL_DNS" => Some("LOCAL_DNS"),
         _ => None,
     }
 }
@@ -464,8 +465,9 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                 COUNT(DISTINCT client_ip) as unique_clients,
                 AVG(response_time_ms) as avg_time,
                 AVG(CASE WHEN cache_hit = 1 THEN response_time_ms END) as avg_cache_time,
-                AVG(CASE WHEN cache_hit = 0 AND blocked = 0 THEN response_time_ms END) as avg_upstream_time,
-                SUM(CASE WHEN cache_hit = 0 AND blocked = 0 THEN 1 ELSE 0 END) as upstream_count,
+                AVG(CASE WHEN cache_hit = 0 AND blocked = 0 AND response_status != 'LOCAL_DNS' THEN response_time_ms END) as avg_upstream_time,
+                SUM(CASE WHEN cache_hit = 0 AND blocked = 0 AND (response_status IS NULL OR response_status != 'LOCAL_DNS') THEN 1 ELSE 0 END) as upstream_count,
+                SUM(CASE WHEN response_status = 'LOCAL_DNS' THEN 1 ELSE 0 END) as local_dns_count,
                 SUM(CASE WHEN blocked = 1 AND block_source = 'blocklist' THEN 1 ELSE 0 END) as blocklist_count,
                 SUM(CASE WHEN blocked = 1 AND block_source = 'managed_domain' THEN 1 ELSE 0 END) as managed_domain_count,
                 SUM(CASE WHEN blocked = 1 AND block_source = 'regex_filter' THEN 1 ELSE 0 END) as regex_filter_count
@@ -528,6 +530,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
                 .unwrap_or(0.0),
             queries_cache_hits: cache_hits,
             queries_upstream: row.get::<i64, _>("upstream_count") as u64,
+            queries_local_dns: row.get::<i64, _>("local_dns_count") as u64,
             queries_blocked_by_blocklist: row.get::<i64, _>("blocklist_count") as u64,
             queries_blocked_by_managed_domain: row.get::<i64, _>("managed_domain_count") as u64,
             queries_blocked_by_regex_filter: row.get::<i64, _>("regex_filter_count") as u64,
