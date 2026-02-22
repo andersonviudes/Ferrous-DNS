@@ -71,9 +71,6 @@ impl DnsResolution {
 pub trait DnsResolver: Send + Sync {
     async fn resolve(&self, query: &DnsQuery) -> Result<DnsResolution, DomainError>;
 
-    /// Check only the DNS cache without going to upstream.
-    /// Returns `Some(resolution)` on hit, `None` on miss.
-    /// Default implementation returns None (no cache).
     fn try_cache(&self, _query: &DnsQuery) -> Option<DnsResolution> {
         None
     }
