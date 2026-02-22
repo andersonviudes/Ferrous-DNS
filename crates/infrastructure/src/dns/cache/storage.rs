@@ -160,6 +160,7 @@ impl DnsCache {
                     self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
                     record.record_hit();
                     let remaining_ttl = record.expires_at_secs.saturating_sub(now_secs) as u32;
+                    self.bloom.set(&key);
                     self.promote_to_l1(domain.as_ref(), record_type, record, now_secs);
                     return Some((
                         record.data.clone(),
@@ -340,6 +341,7 @@ impl DnsCache {
                 record.dnssec_status = ds;
             }
             record.clear_refreshing();
+            self.bloom.set(&key);
 
             let maybe_addresses = if let CachedData::IpAddresses(ref addr) = new_data {
                 Some(Arc::clone(addr))
