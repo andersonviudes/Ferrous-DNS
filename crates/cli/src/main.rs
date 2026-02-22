@@ -137,6 +137,7 @@ async fn async_main() -> anyhow::Result<()> {
         create_client_subnet: use_cases.create_client_subnet,
         delete_client_subnet: use_cases.delete_client_subnet,
         create_manual_client: use_cases.create_manual_client,
+        update_client: use_cases.update_client,
         delete_client: use_cases.delete_client,
         get_blocklist_sources: use_cases.get_blocklist_sources,
         create_blocklist_source: use_cases.create_blocklist_source,
