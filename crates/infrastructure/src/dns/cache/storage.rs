@@ -309,6 +309,16 @@ impl DnsCache {
 
     pub fn rotate_bloom(&self) {
         self.bloom.rotate();
+        // Re-register permanent records so they survive bloom rotation.
+        // Permanent entries are never refreshed (TTL = u64::MAX) and may
+        // only live in L1, so they'd otherwise lose bloom visibility after
+        // 2 rotations (~120 s) and cause spurious upstream calls (SERVFAIL
+        // for non-real TLDs like .server).
+        for entry in self.cache.iter() {
+            if entry.value().is_permanent() {
+                self.bloom.set(entry.key());
+            }
+        }
     }
 
     pub fn access_window_secs(&self) -> u64 {
