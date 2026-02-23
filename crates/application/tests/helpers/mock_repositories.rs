@@ -313,6 +313,10 @@ impl QueryLogRepository for MockQueryLogRepository {
             .iter()
             .filter(|l| l.block_source == Some(BlockSource::RegexFilter))
             .count() as u64;
+        let queries_blocked_by_cname_cloaking = logs
+            .iter()
+            .filter(|l| l.block_source == Some(BlockSource::CnameCloaking))
+            .count() as u64;
 
         Ok(QueryStats {
             queries_total,
@@ -328,6 +332,7 @@ impl QueryLogRepository for MockQueryLogRepository {
             queries_blocked_by_blocklist,
             queries_blocked_by_managed_domain,
             queries_blocked_by_regex_filter,
+            queries_blocked_by_cname_cloaking,
             queries_local_dns: 0,
             queries_by_type: HashMap::new(),
             most_queried_type: None,
