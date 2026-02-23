@@ -28,9 +28,7 @@ impl GetCacheStatsUseCase {
         {
             let guard = self.cache.read().unwrap();
             if let Some(ref cached) = *guard {
-                if cached.period_hours == period_hours
-                    && cached.computed_at.elapsed() < CACHE_TTL
-                {
+                if cached.period_hours == period_hours && cached.computed_at.elapsed() < CACHE_TTL {
                     return Ok(cached.data.clone());
                 }
             }

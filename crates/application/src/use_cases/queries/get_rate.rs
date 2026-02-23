@@ -58,11 +58,7 @@ impl GetQueryRateUseCase {
     pub fn new(repository: Arc<dyn QueryLogRepository>) -> Self {
         Self {
             repository,
-            cache: [
-                RwLock::new(None),
-                RwLock::new(None),
-                RwLock::new(None),
-            ],
+            cache: [RwLock::new(None), RwLock::new(None), RwLock::new(None)],
         }
     }
 
