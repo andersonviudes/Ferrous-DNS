@@ -3,8 +3,6 @@ use ferrous_dns_domain::DomainError;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
-/// Rate results are short-lived: 3 s TTL keeps the dashboard responsive while
-/// preventing a 4 s query from running on every 5 s poll cycle.
 const RATE_CACHE_TTL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy)]
@@ -53,7 +51,6 @@ struct CachedRate {
 
 pub struct GetQueryRateUseCase {
     repository: Arc<dyn QueryLogRepository>,
-    /// One cache slot per RateUnit variant (Second=0, Minute=1, Hour=2).
     cache: [RwLock<Option<CachedRate>>; 3],
 }
 
@@ -103,7 +100,6 @@ impl GetQueryRateUseCase {
         })
     }
 }
-
 
 fn format_rate(count: u64, suffix: &str) -> String {
     if count >= 1_000_000 {

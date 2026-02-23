@@ -13,10 +13,6 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
-/// Pre-compute a UTC cutoff timestamp string for SQLite range scans.
-/// Binding a concrete datetime string lets the query planner use index range
-/// scans on `created_at` instead of evaluating an expression at scan time.
-#[inline]
 fn hours_ago_cutoff(hours: f32) -> String {
     let ms = (hours * 3_600_000.0) as i64;
     (Utc::now() - chrono::Duration::milliseconds(ms))
@@ -24,14 +20,12 @@ fn hours_ago_cutoff(hours: f32) -> String {
         .to_string()
 }
 
-#[inline]
 fn seconds_ago_cutoff(seconds: i64) -> String {
     (Utc::now() - chrono::Duration::seconds(seconds))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()
 }
 
-#[inline]
 fn days_ago_cutoff(days: u32) -> String {
     (Utc::now() - chrono::Duration::days(days as i64))
         .format("%Y-%m-%d %H:%M:%S")
