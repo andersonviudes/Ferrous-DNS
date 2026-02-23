@@ -6,9 +6,10 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["dns-over-rustls", "dns-over-https"]
+default = ["dns-over-rustls", "dns-over-https", "dns-over-quic"]
 dns-over-rustls = []
 dns-over-https = []
+dns-over-quic = []
 
 [dependencies]
 ferrous-dns-domain.workspace = true
