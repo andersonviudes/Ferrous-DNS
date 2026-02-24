@@ -48,7 +48,7 @@ impl NegativeDnsCache {
     pub fn insert(&self, domain: &str, record_type: RecordType, ttl: u32) {
         if self.cache.len() >= self.max_entries {
             let now = coarse_now_secs();
-            let expired: SmallVec<[CacheKey; 16]> = self
+            let expired: SmallVec<[CacheKey; EVICTION_BATCH_SIZE]> = self
                 .cache
                 .iter()
                 .filter(|e| now >= e.value().expires_at_secs)

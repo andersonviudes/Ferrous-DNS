@@ -2,7 +2,7 @@ use super::QueryEvent;
 use tokio::sync::mpsc;
 use tracing::warn;
 
-const QUERY_LOG_CHANNEL_CAPACITY: usize = 4_096;
+const QUERY_EVENT_CHANNEL_CAPACITY: usize = 4096;
 
 #[derive(Clone)]
 pub struct QueryEventEmitter {
@@ -15,7 +15,7 @@ impl QueryEventEmitter {
     }
 
     pub fn new_enabled() -> (Self, mpsc::Receiver<QueryEvent>) {
-        let (tx, rx) = mpsc::channel(QUERY_LOG_CHANNEL_CAPACITY);
+        let (tx, rx) = mpsc::channel(QUERY_EVENT_CHANNEL_CAPACITY);
         let emitter = Self { sender: Some(tx) };
         (emitter, rx)
     }
