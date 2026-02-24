@@ -115,8 +115,8 @@ fn create_udp_socket(domain: Domain, socket_addr: SocketAddr) -> anyhow::Result<
     socket.set_reuse_address(true)?;
     #[cfg(unix)]
     socket.set_reuse_port(true)?;
-    socket.set_recv_buffer_size(8 * 1024 * 1024)?;
-    socket.set_send_buffer_size(4 * 1024 * 1024)?;
+    socket.set_recv_buffer_size(512 * 1024)?;
+    socket.set_send_buffer_size(512 * 1024)?;
     socket.bind(&socket_addr.into())?;
     pktinfo::enable_pktinfo(&socket);
     socket.set_nonblocking(true)?;
