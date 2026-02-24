@@ -8,11 +8,10 @@ const FLAG_REFRESHING: u8 = 0b010;
 const FLAG_PERMANENT: u8 = 0b100;
 const STALE_GRACE_PERIOD_MULTIPLIER: u64 = 2;
 
-#[repr(C, align(64))]
+#[repr(align(64))]
 pub struct HotCounters {
     pub hit_count: AtomicU64,
     pub last_access: AtomicU64,
-    _pad: [u8; 48],
 }
 
 impl HotCounters {
@@ -20,7 +19,6 @@ impl HotCounters {
         Self {
             hit_count: AtomicU64::new(0),
             last_access: AtomicU64::new(now_secs),
-            _pad: [0u8; 48],
         }
     }
 }
@@ -63,7 +61,6 @@ impl Clone for CachedRecord {
                 last_access: AtomicU64::new(
                     self.counters.last_access.load(AtomicOrdering::Relaxed),
                 ),
-                _pad: [0u8; 48],
             },
             ttl: self.ttl,
             record_type: self.record_type,

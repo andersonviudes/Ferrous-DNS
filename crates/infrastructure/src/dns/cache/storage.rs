@@ -436,9 +436,8 @@ impl DnsCache {
 
         let now_secs = coarse_now_secs();
         let total_to_sample = count * self.eviction_sample_size;
-
-        let mut urgent_expired: Vec<CacheKey> = Vec::with_capacity(count);
         let mut scored: Vec<(CacheKey, f64)> = Vec::with_capacity(total_to_sample);
+        let mut urgent_marked = 0usize;
         let mut sampled = 0usize;
 
         for entry in self.cache.iter() {
@@ -459,7 +458,8 @@ impl DnsCache {
                 if !within_window {
                     let score = self.compute_score(record, now_secs);
                     if score < 0.0 {
-                        urgent_expired.push(entry.key().clone());
+                        record.mark_for_deletion();
+                        urgent_marked += 1;
                         sampled += 1;
                         continue;
                     }
@@ -473,23 +473,28 @@ impl DnsCache {
 
         scored.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let mut total_evicted = 0usize;
+        let mut scored_evicted = 0usize;
         let mut last_worst_score = f64::MAX;
 
-        for key in urgent_expired.into_iter().take(count) {
+        for (key, score) in scored.into_iter().take(count.saturating_sub(urgent_marked)) {
             self.cache.remove(&key);
-            total_evicted += 1;
-        }
-
-        for (key, score) in scored.into_iter().take(count.saturating_sub(total_evicted)) {
-            self.cache.remove(&key);
-            total_evicted += 1;
+            scored_evicted += 1;
             last_worst_score = score;
         }
 
-        self.metrics
-            .evictions
-            .fetch_add(total_evicted as u64, AtomicOrdering::Relaxed);
+        let retain_removed = if urgent_marked > 0 {
+            let before = self.cache.len();
+            self.cache
+                .retain(|_, record| !record.is_marked_for_deletion());
+            before.saturating_sub(self.cache.len())
+        } else {
+            0
+        };
+
+        self.metrics.evictions.fetch_add(
+            (scored_evicted + retain_removed) as u64,
+            AtomicOrdering::Relaxed,
+        );
 
         if self.adaptive_thresholds && last_worst_score < f64::MAX {
             let current = self.get_threshold();
