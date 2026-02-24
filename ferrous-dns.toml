@@ -102,11 +102,11 @@ query_log_channel_capacity = 10000
 # Maximum entries written in a single INSERT transaction.
 # Larger batches mean fewer transactions and higher throughput.
 # Default: 500.
-query_log_max_batch_size = 500
+query_log_max_batch_size = 2000
 
 # Milliseconds between flush cycles. Lower = more frequent small writes;
-# higher = fewer but larger batches. Default: 100.
-query_log_flush_interval_ms = 100
+# higher = fewer but larger batches. Default: 200.
+query_log_flush_interval_ms = 200
 
 # Uniform sampling: record 1 out of every N queries (1 = log all).
 # At 100k q/s, setting 10 yields ~10k entries/s (~864M rows/day).
