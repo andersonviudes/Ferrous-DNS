@@ -21,7 +21,8 @@ pub async fn start_dns_server(bind_addr: String, handler: DnsServerHandler) -> a
 
     let num_workers = std::thread::available_parallelism()
         .map(|n| n.get())
-        .unwrap_or(1);
+        .unwrap_or(1)
+        .min(4);
 
     info!(bind_address = %socket_addr, num_workers, "Starting DNS server with SO_REUSEPORT");
 

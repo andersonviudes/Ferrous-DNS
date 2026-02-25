@@ -26,7 +26,12 @@ pub async fn recv_with_pktinfo(
     loop {
         socket.readable().await?;
         match try_recv_with_pktinfo(socket, buf) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock
+                    || e.kind() == io::ErrorKind::Interrupted =>
+            {
+                continue
+            }
             result => return result,
         }
     }
@@ -96,7 +101,12 @@ pub async fn send_with_src_ip(
     loop {
         socket.writable().await?;
         match try_send_with_src_ip(socket, buf, to, src) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock
+                    || e.kind() == io::ErrorKind::Interrupted =>
+            {
+                continue
+            }
             result => return result,
         }
     }
