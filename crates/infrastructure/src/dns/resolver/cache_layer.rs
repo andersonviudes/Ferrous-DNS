@@ -303,4 +303,3 @@ fn clamp_negative_ttl(ttl: u32) -> u32 {
     const MAX_NEGATIVE_TTL: u32 = 3_600;
     ttl.clamp(MIN_NEGATIVE_TTL, MAX_NEGATIVE_TTL)
 }
-

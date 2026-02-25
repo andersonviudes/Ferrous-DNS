@@ -55,8 +55,7 @@ impl CoreResolver {
         };
         domain.eq_ignore_ascii_case(exact.as_ref())
             || (domain.len() > suffix.len()
-                && domain[domain.len() - suffix.len()..]
-                    .eq_ignore_ascii_case(suffix.as_ref()))
+                && domain[domain.len() - suffix.len()..].eq_ignore_ascii_case(suffix.as_ref()))
     }
 
     async fn resolve_local_tld(&self, query: &DnsQuery) -> Result<DnsResolution, DomainError> {
