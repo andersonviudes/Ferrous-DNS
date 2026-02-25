@@ -18,7 +18,7 @@ struct L1Entry {
 thread_local! {
     static L1_CACHE: RefCell<LruCache<CompactString, L1Entry, FxBuildHasher>> =
         RefCell::new(LruCache::with_hasher(
-            NonZeroUsize::new(512).unwrap(),
+            NonZeroUsize::new(1024).unwrap(),
             FxBuildHasher
         ));
 }
