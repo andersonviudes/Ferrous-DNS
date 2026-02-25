@@ -16,11 +16,6 @@ use std::sync::Arc;
 use tokio::sync::watch;
 use tracing::debug;
 
-/// Subset of `DnsResolution` broadcast to inflight followers.
-///
-/// Contains only the fields followers actually use. Excludes `authority_records`
-/// (`Vec<Record>`) — which is expensive to clone for DNSSEC responses and is
-/// discarded by every follower anyway (they reconstruct with `vec![]`).
 struct InflightResult {
     addresses: Arc<Vec<IpAddr>>,
     cname_chain: Arc<[Arc<str>]>,

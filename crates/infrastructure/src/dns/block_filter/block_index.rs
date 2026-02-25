@@ -74,14 +74,8 @@ pub struct BlockIndex {
     pub allowlists: AllowlistIndex,
     pub managed_denies: HashMap<i64, DashSet<CompactString, FxBuildHasher>>,
     pub managed_deny_wildcards: HashMap<i64, SuffixTrie>,
-    /// User-defined regex allow rules (action=allow): group_id → compiled patterns
     pub allow_regex_patterns: HashMap<i64, Vec<Regex>>,
-    /// User-defined regex block rules (action=deny): group_id → compiled patterns
     pub block_regex_patterns: HashMap<i64, Vec<Regex>>,
-    /// Set of group IDs that have managed-deny or regex rules configured.
-    /// Queries for groups NOT in this set skip the four per-group lookups
-    /// entirely, saving ~60–80 ns per query on typical deployments where only
-    /// some groups use advanced filtering.
     pub groups_with_advanced_rules: HashSet<i64>,
 }
 
@@ -114,8 +108,6 @@ impl BlockIndex {
         })
     }
 
-    /// Returns `None` if the domain is not blocked, or `Some(source)` identifying
-    /// which filter layer caused the block.
     #[inline]
     pub fn is_blocked(&self, domain: &str, group_id: i64) -> Option<BlockSource> {
         if self.allowlists.is_allowed(domain, group_id) {

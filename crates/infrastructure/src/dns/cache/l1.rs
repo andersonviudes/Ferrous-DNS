@@ -24,11 +24,6 @@ thread_local! {
         ));
 }
 
-/// Builds the L1 key as `"{record_type}:{domain}"`.
-///
-/// For domains where the combined key fits within 128 bytes (covers all real-world
-/// DNS names), the key is built in a stack-allocated buffer and looked up via
-/// `&str` — zero heap allocation on the lookup hot path.
 #[inline]
 pub fn l1_get(domain: &str, record_type: &RecordType) -> Option<L1Hit> {
     let type_str = record_type.as_str();
@@ -41,13 +36,9 @@ pub fn l1_get(domain: &str, record_type: &RecordType) -> Option<L1Hit> {
         buf[..type_len].copy_from_slice(type_str.as_bytes());
         buf[type_len] = b':';
         buf[type_len + 1..total].copy_from_slice(domain.as_bytes());
-        // Safety: buf is the concatenation of two valid UTF-8 slices and the
-        // ASCII byte b':', so the result is valid UTF-8.
         let key_str = unsafe { std::str::from_utf8_unchecked(&buf[..total]) };
         lookup_l1(key_str)
     } else {
-        // Rare: very long domain name. CompactString may heap-allocate here,
-        // but this path is not exercised in any real-world hot path.
         let mut key = CompactString::with_capacity(total);
         key.push_str(type_str);
         key.push(':');
