@@ -87,14 +87,12 @@ async fn run_udp_worker(
                             fast_query.record_type,
                             client_ip,
                         ) {
-                            if let Some((wire, wire_len)) =
-                                wire_response::build_cache_hit_response(
-                                    &fast_query,
-                                    query_buf,
-                                    &addresses,
-                                    ttl,
-                                )
-                            {
+                            if let Some((wire, wire_len)) = wire_response::build_cache_hit_response(
+                                &fast_query,
+                                query_buf,
+                                &addresses,
+                                ttl,
+                            ) {
                                 let _ = pktinfo::try_send_with_src_ip(
                                     socket.get_ref(),
                                     &wire[..wire_len],

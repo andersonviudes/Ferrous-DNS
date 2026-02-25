@@ -130,7 +130,11 @@ pub(crate) fn try_send_with_src_ip(
     Ok(())
 }
 
-fn socket_send_fallback(socket: &std::net::UdpSocket, buf: &[u8], to: SocketAddr) -> io::Result<()> {
+fn socket_send_fallback(
+    socket: &std::net::UdpSocket,
+    buf: &[u8],
+    to: SocketAddr,
+) -> io::Result<()> {
     let fd = socket.as_raw_fd();
     let dst_addr = socket_addr_to_sockaddr_in(to);
     let iov = libc::iovec {
