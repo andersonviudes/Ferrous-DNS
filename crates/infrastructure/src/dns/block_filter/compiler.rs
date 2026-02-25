@@ -7,6 +7,7 @@ use dashmap::{DashMap, DashSet};
 use fancy_regex::Regex;
 use ferrous_dns_domain::DomainError;
 use futures::future::join_all;
+use rayon::prelude::*;
 use rustc_hash::FxBuildHasher;
 use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;
@@ -292,7 +293,10 @@ fn build_exact_and_wildcard(
             .count();
 
     let bloom_capacity = (exact_count + 100).max(1000);
-    let bloom = AtomicBloom::new(bloom_capacity, 0.001);
+    // 0.05 FP rate → num_hashes=5 (fast path) and ~1 MB bloom for 1.2 M domains,
+    // which fits in the RPi4 L3 cache. A false positive only costs one extra
+    // DashMap lookup on allow-listed queries — no correctness impact.
+    let bloom = AtomicBloom::new(bloom_capacity, 0.05);
     let exact: DashMap<CompactString, SourceBitSet, FxBuildHasher> =
         DashMap::with_capacity_and_hasher(exact_count, FxBuildHasher);
     let mut wildcard = SuffixTrie::new();
@@ -306,17 +310,27 @@ fn build_exact_and_wildcard(
             .or_insert(MANUAL_SOURCE_BIT);
     }
 
+    // Parallel pass: exact domains are the vast majority (~95 %+) and both
+    // AtomicBloom (fetch_or) and DashMap (shard locks) are Sync.
+    source_entries.par_iter().for_each(|(bit, entries)| {
+        let source_bit: SourceBitSet = 1u64 << *bit;
+        for entry in entries {
+            if let ParsedEntry::Exact(domain) = entry {
+                bloom.set(domain);
+                exact
+                    .entry(CompactString::new(domain))
+                    .and_modify(|bits| *bits |= source_bit)
+                    .or_insert(source_bit);
+            }
+        }
+    });
+
+    // Sequential pass: wildcards and patterns (SuffixTrie requires &mut self).
     for (bit, entries) in source_entries {
-        let source_bit: SourceBitSet = 1u64 << bit;
+        let source_bit: SourceBitSet = 1u64 << *bit;
         for entry in entries {
             match entry {
-                ParsedEntry::Exact(domain) => {
-                    bloom.set(domain);
-                    exact
-                        .entry(CompactString::new(domain))
-                        .and_modify(|bits| *bits |= source_bit)
-                        .or_insert(source_bit);
-                }
+                ParsedEntry::Exact(_) => {}
                 ParsedEntry::Wildcard(pattern) => {
                     wildcard.insert_wildcard(pattern, source_bit);
                 }
