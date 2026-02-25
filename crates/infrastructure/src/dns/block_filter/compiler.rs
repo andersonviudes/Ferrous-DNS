@@ -11,7 +11,19 @@ use rayon::prelude::*;
 use rustc_hash::FxBuildHasher;
 use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use tracing::{info, warn};
+
+static BLOCKLIST_BUILD_POOL: LazyLock<rayon::ThreadPool> = LazyLock::new(|| {
+    let parallelism = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(2);
+    let num_threads = (parallelism / 2).clamp(1, 4);
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .expect("blocklist rayon pool")
+});
 
 #[derive(Debug)]
 pub enum ParsedEntry {
@@ -307,17 +319,19 @@ fn build_exact_and_wildcard(
             .or_insert(MANUAL_SOURCE_BIT);
     }
 
-    source_entries.par_iter().for_each(|(bit, entries)| {
-        let source_bit: SourceBitSet = 1u64 << *bit;
-        for entry in entries {
-            if let ParsedEntry::Exact(domain) = entry {
-                bloom.set(domain);
-                exact
-                    .entry(CompactString::new(domain))
-                    .and_modify(|bits| *bits |= source_bit)
-                    .or_insert(source_bit);
+    BLOCKLIST_BUILD_POOL.install(|| {
+        source_entries.par_iter().for_each(|(bit, entries)| {
+            let source_bit: SourceBitSet = 1u64 << *bit;
+            for entry in entries {
+                if let ParsedEntry::Exact(domain) = entry {
+                    bloom.set(domain);
+                    exact
+                        .entry(CompactString::new(domain))
+                        .and_modify(|bits| *bits |= source_bit)
+                        .or_insert(source_bit);
+                }
             }
-        }
+        });
     });
 
     for (bit, entries) in source_entries {
