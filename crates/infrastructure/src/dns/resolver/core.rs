@@ -53,8 +53,10 @@ impl CoreResolver {
         let Some((suffix, exact)) = &self.local_domain_suffix else {
             return false;
         };
-        let lower = domain.to_lowercase();
-        lower.ends_with(suffix.as_ref()) || lower == exact.as_ref()
+        let suf = suffix.as_ref();
+        domain.eq_ignore_ascii_case(exact.as_ref())
+            || (domain.len() >= suf.len()
+                && domain[domain.len() - suf.len()..].eq_ignore_ascii_case(suf))
     }
 
     async fn resolve_local_tld(&self, query: &DnsQuery) -> Result<DnsResolution, DomainError> {

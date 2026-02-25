@@ -6,6 +6,7 @@ use hickory_proto::rr::{Name, RData, Record};
 use hickory_proto::serialize::binary::{BinEncodable, BinEncoder};
 use hickory_server::authority::MessageResponseBuilder;
 use hickory_server::server::{Request, RequestHandler, ResponseHandler, ResponseInfo};
+use smallvec::SmallVec;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -40,7 +41,8 @@ impl DnsServerHandler {
     pub async fn handle_raw_udp_fallback(&self, raw: &[u8], client_ip: IpAddr) -> Option<Vec<u8>> {
         let query_msg = Message::from_vec(raw).ok()?;
 
-        let queries: Vec<_> = query_msg.queries().to_vec();
+        let queries: SmallVec<[hickory_proto::op::Query; 1]> =
+            query_msg.queries().iter().cloned().collect();
         let query_info = queries.first()?;
 
         let domain_name = query_info.name().to_utf8();

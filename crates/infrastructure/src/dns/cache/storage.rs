@@ -175,40 +175,40 @@ impl DnsCache {
         }
 
         let borrowed = BorrowedKey::new(domain.as_ref(), *record_type);
-        let in_bloom = self.bloom.check(&borrowed);
-        let key = CacheKey::new(domain.as_ref(), *record_type);
 
-        if let Some(entry) = self.cache.get(&key) {
-            let record = entry.value();
+        if self.bloom.check(&borrowed) {
+            let key = CacheKey::new(domain.as_ref(), *record_type);
 
-            let now_secs = coarse_now_secs();
+            if let Some(entry) = self.cache.get(&key) {
+                let record = entry.value();
 
-            if record.is_stale_usable_at_secs(now_secs) {
-                self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
-                record.record_hit();
-                return Some((
-                    record.data.clone(),
-                    Some(record.dnssec_status),
-                    Some(STALE_SERVE_TTL),
-                ));
-            }
+                let now_secs = coarse_now_secs();
 
-            if record.is_expired_at_secs(now_secs) {
-                record.mark_for_deletion();
-                drop(entry);
-            } else {
-                self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
-                record.record_hit();
-                let remaining_ttl = record.expires_at_secs.saturating_sub(now_secs) as u32;
-                if !in_bloom {
-                    self.bloom.set(&key);
+                if record.is_stale_usable_at_secs(now_secs) {
+                    self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
+                    record.record_hit();
+                    return Some((
+                        record.data.clone(),
+                        Some(record.dnssec_status),
+                        Some(STALE_SERVE_TTL),
+                    ));
                 }
-                self.promote_to_l1(domain.as_ref(), record_type, record, now_secs);
-                return Some((
-                    record.data.clone(),
-                    Some(record.dnssec_status),
-                    Some(remaining_ttl),
-                ));
+
+                if record.is_expired_at_secs(now_secs) {
+                    record.mark_for_deletion();
+                    drop(entry);
+                } else {
+                    self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
+                    record.record_hit();
+                    let remaining_ttl = record.expires_at_secs.saturating_sub(now_secs) as u32;
+                    self.bloom.set(&key);
+                    self.promote_to_l1(domain.as_ref(), record_type, record, now_secs);
+                    return Some((
+                        record.data.clone(),
+                        Some(record.dnssec_status),
+                        Some(remaining_ttl),
+                    ));
+                }
             }
         }
 

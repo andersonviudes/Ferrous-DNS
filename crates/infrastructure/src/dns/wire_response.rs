@@ -10,7 +10,7 @@ pub fn build_cache_hit_response(
     query_buf: &[u8],
     addresses: &[IpAddr],
     ttl: u32,
-) -> Option<([u8; 523], usize)> {
+) -> Option<([u8; 4107], usize)> {
     if addresses.is_empty() || query.question_end > query_buf.len() {
         return None;
     }
@@ -27,13 +27,13 @@ pub fn build_cache_hit_response(
 
     let opt_size = if query.has_edns { OPT_RECORD.len() } else { 0 };
     let total_size = 12 + question_len + answers_size + opt_size;
-    let max_size = (query.client_max_size as usize).min(512) + opt_size;
+    let max_size = (query.client_max_size as usize).min(4096) + opt_size;
 
     if total_size > max_size {
         return None;
     }
 
-    let mut buf = [0u8; 523];
+    let mut buf = [0u8; 4107];
 
     buf[0] = (query.id >> 8) as u8;
     buf[1] = query.id as u8;
