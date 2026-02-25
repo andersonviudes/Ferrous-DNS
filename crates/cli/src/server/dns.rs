@@ -67,9 +67,6 @@ async fn run_udp_worker(
     let mut recv_buf = [0u8; 4096];
 
     loop {
-        // readable() returns a ReadyGuard — calling clear_readiness() on it
-        // tells Tokio to re-arm epoll, preventing the busy-loop that occurs
-        // when raw recvmsg syscalls bypass Tokio's I/O driver readiness tracking.
         let mut guard = match socket.readable().await {
             Ok(g) => g,
             Err(_) => break,
