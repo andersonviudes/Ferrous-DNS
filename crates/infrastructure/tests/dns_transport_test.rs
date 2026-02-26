@@ -131,7 +131,7 @@ fn test_tls_transport_different_hostnames() {
 #[test]
 fn test_https_transport_creation() {
     let url = DnsServerBuilder::cloudflare_https();
-    let transport = HttpsTransport::new(url.clone());
+    let transport = HttpsTransport::new(url.clone(), "1.1.1.1".to_string(), vec![]);
 
     assert_eq!(transport.protocol_name(), "HTTPS");
 }
@@ -139,7 +139,7 @@ fn test_https_transport_creation() {
 #[test]
 fn test_https_transport_google() {
     let url = DnsServerBuilder::google_https();
-    let transport = HttpsTransport::new(url.clone());
+    let transport = HttpsTransport::new(url.clone(), "dns.google".to_string(), vec![]);
 
     assert_eq!(transport.protocol_name(), "HTTPS");
 }
@@ -147,7 +147,7 @@ fn test_https_transport_google() {
 #[test]
 fn test_https_transport_custom_url() {
     let custom_url = "https://example.com/dns-query".to_string();
-    let _transport = HttpsTransport::new(custom_url.clone());
+    let _transport = HttpsTransport::new(custom_url.clone(), "example.com".to_string(), vec![]);
 }
 
 #[test]
@@ -159,7 +159,12 @@ fn test_https_transport_various_providers() {
     ];
 
     for provider in providers {
-        let transport = HttpsTransport::new(provider.to_string());
+        let hostname = provider
+            .strip_prefix("https://")
+            .and_then(|r| r.split('/').next())
+            .unwrap_or("")
+            .to_string();
+        let transport = HttpsTransport::new(provider.to_string(), hostname, vec![]);
 
         assert_eq!(transport.protocol_name(), "HTTPS");
     }
@@ -196,7 +201,7 @@ fn test_quic_transport_creation() {
 #[test]
 fn test_h3_transport_creation() {
     let url = DnsServerBuilder::cloudflare_h3();
-    let transport = H3Transport::new(url);
+    let transport = H3Transport::new(url, vec![]);
 
     assert_eq!(transport.protocol_name(), "H3");
 }
@@ -205,7 +210,7 @@ fn test_h3_transport_creation() {
 #[test]
 fn test_h3_transport_google() {
     let url = DnsServerBuilder::google_h3();
-    let transport = H3Transport::new(url);
+    let transport = H3Transport::new(url, vec![]);
 
     assert_eq!(transport.protocol_name(), "H3");
 }
@@ -216,7 +221,11 @@ fn test_all_protocols_have_unique_names() {
     let tcp = TcpTransport::new(DnsServerBuilder::google_dns());
     let (tls_addr, tls_host) = DnsServerBuilder::cloudflare_tls();
     let tls = TlsTransport::new(tls_addr, tls_host);
-    let https = HttpsTransport::new(DnsServerBuilder::cloudflare_https());
+    let https = HttpsTransport::new(
+        DnsServerBuilder::cloudflare_https(),
+        "1.1.1.1".to_string(),
+        vec![],
+    );
 
     let mut names = vec![
         udp.protocol_name(),
@@ -227,7 +236,7 @@ fn test_all_protocols_have_unique_names() {
 
     #[cfg(feature = "dns-over-h3")]
     {
-        let h3 = H3Transport::new(DnsServerBuilder::cloudflare_h3());
+        let h3 = H3Transport::new(DnsServerBuilder::cloudflare_h3(), vec![]);
         names.push(h3.protocol_name());
     }
 

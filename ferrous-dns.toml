@@ -5,6 +5,8 @@ bind_address = "0.0.0.0"                # Address to bind on; 0.0.0.0 listens on
 
 [dns]
 upstream_servers = []                   # Fallback upstream DNS servers (used when no pool matches)
+read_busy_timeout_secs = 15
+read_acquire_timeout_secs = 15
 query_timeout = 3                       # Seconds to wait for an upstream response before timing out
 cache_enabled = true                    # Enable in-memory DNS response cache
 cache_ttl = 7200                        # Default TTL (seconds) for cached entries when the record has none
@@ -52,12 +54,13 @@ servers = [
     "h3://dns.adguard-dns.com/dns-query",
 ]
 
+
 [[dns.pools]]
 name = "cloudflare"
 strategy = "Failover"
 priority = 2
 servers = [
-    "https://dns.cloudflare.com/dns-query",
+    "https://cloudflare-dns.com/dns-query",
 ]
 
 [dns.health_check]

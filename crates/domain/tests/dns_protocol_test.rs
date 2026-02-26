@@ -44,9 +44,15 @@ fn test_parse_https() {
 #[test]
 fn test_parse_https_with_hostname() {
     let protocol: DnsProtocol = "https://dns.google/dns-query".parse().unwrap();
-    if let DnsProtocol::Https { url, hostname } = protocol {
+    if let DnsProtocol::Https {
+        url,
+        hostname,
+        resolved_addrs,
+    } = protocol
+    {
         assert_eq!(&*url, "https://dns.google/dns-query");
         assert_eq!(&*hostname, "dns.google");
+        assert!(resolved_addrs.is_empty());
     } else {
         panic!("Expected Https variant");
     }
@@ -174,9 +180,15 @@ fn test_parse_h3() {
 #[test]
 fn test_parse_h3_with_hostname() {
     let protocol: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
-    if let DnsProtocol::H3 { url, hostname } = protocol {
+    if let DnsProtocol::H3 {
+        url,
+        hostname,
+        resolved_addrs,
+    } = protocol
+    {
         assert_eq!(&*url, "h3://dns.google/dns-query");
         assert_eq!(&*hostname, "dns.google");
+        assert!(resolved_addrs.is_empty());
     } else {
         panic!("Expected H3 variant");
     }
@@ -371,11 +383,11 @@ fn test_needs_resolution_resolved() {
     let tls: DnsProtocol = "tls://1.1.1.1:853".parse().unwrap();
     assert!(!tls.needs_resolution());
 
-    let https: DnsProtocol = "https://dns.google/dns-query".parse().unwrap();
-    assert!(!https.needs_resolution());
+    let https_ip: DnsProtocol = "https://1.1.1.1/dns-query".parse().unwrap();
+    assert!(!https_ip.needs_resolution());
 
-    let h3: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
-    assert!(!h3.needs_resolution());
+    let h3_ip: DnsProtocol = "h3://1.1.1.1/dns-query".parse().unwrap();
+    assert!(!h3_ip.needs_resolution());
 }
 
 #[test]
@@ -414,4 +426,119 @@ fn test_with_resolved_addr_ipv6() {
     let sa = resolved.socket_addr().unwrap();
     assert!(sa.is_ipv6());
     assert_eq!(format!("{}", resolved), "udp://[2001:4860:4860::8888]:53");
+}
+
+// ── HTTPS/H3 pre-resolved addresses tests ──────────────────────────────────
+
+#[test]
+fn test_parse_https_starts_with_empty_resolved_addrs() {
+    let protocol: DnsProtocol = "https://cloudflare-dns.com/dns-query".parse().unwrap();
+    if let DnsProtocol::Https { resolved_addrs, .. } = &protocol {
+        assert!(resolved_addrs.is_empty());
+    } else {
+        panic!("Expected Https variant");
+    }
+}
+
+#[test]
+fn test_parse_h3_starts_with_empty_resolved_addrs() {
+    let protocol: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
+    if let DnsProtocol::H3 { resolved_addrs, .. } = &protocol {
+        assert!(resolved_addrs.is_empty());
+    } else {
+        panic!("Expected H3 variant");
+    }
+}
+
+#[test]
+fn test_https_with_resolved_addrs() {
+    let protocol: DnsProtocol = "https://cloudflare-dns.com/dns-query".parse().unwrap();
+    let addrs: Vec<std::net::SocketAddr> = vec![
+        "104.16.248.249:443".parse().unwrap(),
+        "104.16.249.249:443".parse().unwrap(),
+    ];
+    let resolved = protocol.with_resolved_addrs(addrs.clone());
+    if let DnsProtocol::Https { resolved_addrs, .. } = &resolved {
+        assert_eq!(resolved_addrs, &addrs);
+    } else {
+        panic!("Expected Https variant");
+    }
+}
+
+#[test]
+fn test_h3_with_resolved_addrs() {
+    let protocol: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
+    let addrs: Vec<std::net::SocketAddr> = vec![
+        "8.8.8.8:443".parse().unwrap(),
+        "8.8.4.4:443".parse().unwrap(),
+    ];
+    let resolved = protocol.with_resolved_addrs(addrs.clone());
+    if let DnsProtocol::H3 { resolved_addrs, .. } = &resolved {
+        assert_eq!(resolved_addrs, &addrs);
+    } else {
+        panic!("Expected H3 variant");
+    }
+}
+
+#[test]
+fn test_https_needs_resolution_empty_addrs() {
+    let protocol: DnsProtocol = "https://cloudflare-dns.com/dns-query".parse().unwrap();
+    assert!(
+        protocol.needs_resolution(),
+        "HTTPS with hostname and empty resolved_addrs should need resolution"
+    );
+}
+
+#[test]
+fn test_https_needs_resolution_with_addrs() {
+    let protocol: DnsProtocol = "https://cloudflare-dns.com/dns-query".parse().unwrap();
+    let resolved = protocol.with_resolved_addrs(vec!["104.16.248.249:443".parse().unwrap()]);
+    assert!(
+        !resolved.needs_resolution(),
+        "HTTPS with resolved_addrs should not need resolution"
+    );
+}
+
+#[test]
+fn test_h3_needs_resolution_empty_addrs() {
+    let protocol: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
+    assert!(
+        protocol.needs_resolution(),
+        "H3 with hostname and empty resolved_addrs should need resolution"
+    );
+}
+
+#[test]
+fn test_h3_needs_resolution_with_addrs() {
+    let protocol: DnsProtocol = "h3://dns.google/dns-query".parse().unwrap();
+    let resolved = protocol.with_resolved_addrs(vec!["8.8.8.8:443".parse().unwrap()]);
+    assert!(
+        !resolved.needs_resolution(),
+        "H3 with resolved_addrs should not need resolution"
+    );
+}
+
+#[test]
+fn test_https_ip_url_needs_no_resolution() {
+    let protocol: DnsProtocol = "https://1.1.1.1/dns-query".parse().unwrap();
+    assert!(
+        !protocol.needs_resolution(),
+        "HTTPS with IP literal should not need resolution"
+    );
+}
+
+#[test]
+fn test_h3_ip_url_needs_no_resolution() {
+    let protocol: DnsProtocol = "h3://1.1.1.1/dns-query".parse().unwrap();
+    assert!(
+        !protocol.needs_resolution(),
+        "H3 with IP literal should not need resolution"
+    );
+}
+
+#[test]
+fn test_with_resolved_addrs_on_non_https_h3_returns_clone() {
+    let protocol: DnsProtocol = "udp://8.8.8.8:53".parse().unwrap();
+    let resolved = protocol.with_resolved_addrs(vec!["1.1.1.1:53".parse().unwrap()]);
+    assert_eq!(protocol, resolved);
 }

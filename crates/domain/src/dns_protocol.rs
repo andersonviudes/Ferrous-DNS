@@ -69,6 +69,7 @@ pub enum DnsProtocol {
     Https {
         url: Arc<str>,
         hostname: Arc<str>,
+        resolved_addrs: Vec<SocketAddr>,
     },
     Quic {
         addr: UpstreamAddr,
@@ -77,6 +78,7 @@ pub enum DnsProtocol {
     H3 {
         url: Arc<str>,
         hostname: Arc<str>,
+        resolved_addrs: Vec<SocketAddr>,
     },
 }
 
@@ -126,7 +128,16 @@ impl DnsProtocol {
             | DnsProtocol::Tcp { addr }
             | DnsProtocol::Tls { addr, .. }
             | DnsProtocol::Quic { addr, .. } => addr.is_unresolved(),
-            DnsProtocol::Https { .. } | DnsProtocol::H3 { .. } => false,
+            DnsProtocol::Https {
+                hostname,
+                resolved_addrs,
+                ..
+            }
+            | DnsProtocol::H3 {
+                hostname,
+                resolved_addrs,
+                ..
+            } => hostname.parse::<std::net::IpAddr>().is_err() && resolved_addrs.is_empty(),
         }
     }
 
@@ -149,6 +160,22 @@ impl DnsProtocol {
                 hostname: hostname.clone(),
             },
             DnsProtocol::Https { .. } | DnsProtocol::H3 { .. } => self.clone(),
+        }
+    }
+
+    pub fn with_resolved_addrs(&self, addrs: Vec<SocketAddr>) -> Self {
+        match self {
+            DnsProtocol::Https { url, hostname, .. } => DnsProtocol::Https {
+                url: url.clone(),
+                hostname: hostname.clone(),
+                resolved_addrs: addrs,
+            },
+            DnsProtocol::H3 { url, hostname, .. } => DnsProtocol::H3 {
+                url: url.clone(),
+                hostname: hostname.clone(),
+                resolved_addrs: addrs,
+            },
+            _ => self.clone(),
         }
     }
 }
@@ -252,7 +279,11 @@ impl FromStr for DnsProtocol {
                 .and_then(|rest| rest.split('/').next())
                 .ok_or_else(|| format!("Invalid H3 URL: {}", s))?
                 .into();
-            return Ok(DnsProtocol::H3 { url, hostname });
+            return Ok(DnsProtocol::H3 {
+                url,
+                hostname,
+                resolved_addrs: vec![],
+            });
         }
         if s.starts_with("https://") {
             let url: Arc<str> = s.into();
@@ -261,7 +292,11 @@ impl FromStr for DnsProtocol {
                 .and_then(|rest| rest.split('/').next())
                 .ok_or_else(|| format!("Invalid HTTPS URL: {}", s))?
                 .into();
-            return Ok(DnsProtocol::Https { url, hostname });
+            return Ok(DnsProtocol::Https {
+                url,
+                hostname,
+                resolved_addrs: vec![],
+            });
         }
         if let Ok(addr) = s.parse::<SocketAddr>() {
             return Ok(DnsProtocol::Udp {

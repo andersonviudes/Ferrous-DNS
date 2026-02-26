@@ -150,7 +150,7 @@ async fn test_pool_manager_tls_hostname_expansion() {
 }
 
 #[tokio::test]
-async fn test_pool_manager_https_not_expanded() {
+async fn test_pool_manager_https_not_expanded_but_preresolved() {
     let pool = UpstreamPool {
         name: "test-https".into(),
         strategy: UpstreamStrategy::Parallel,
@@ -167,6 +167,73 @@ async fn test_pool_manager_https_not_expanded() {
     assert_eq!(
         protocols.len(),
         1,
-        "HTTPS protocols should not be expanded (resolved internally by reqwest)"
+        "HTTPS protocols should remain as 1 entry (not expanded like UDP/TCP)"
     );
+
+    if let DnsProtocol::Https { resolved_addrs, .. } = &protocols[0] {
+        assert!(
+            !resolved_addrs.is_empty(),
+            "HTTPS with hostname should have pre-resolved addresses"
+        );
+    } else {
+        panic!("Expected Https variant, got: {}", protocols[0]);
+    }
+}
+
+#[tokio::test]
+async fn test_pool_manager_preresolves_h3_hostnames() {
+    let pool = UpstreamPool {
+        name: "test-h3".into(),
+        strategy: UpstreamStrategy::Parallel,
+        priority: 1,
+        servers: vec!["h3://dns.google/dns-query".into()],
+        weight: None,
+    };
+
+    let pm = PoolManager::new(vec![pool], None, QueryEventEmitter::new_disabled())
+        .await
+        .expect("PoolManager should create successfully");
+
+    let protocols = pm.get_all_protocols();
+    assert_eq!(
+        protocols.len(),
+        1,
+        "H3 protocols should remain as 1 entry (not expanded like UDP/TCP)"
+    );
+
+    if let DnsProtocol::H3 { resolved_addrs, .. } = &protocols[0] {
+        assert!(
+            !resolved_addrs.is_empty(),
+            "H3 with hostname should have pre-resolved addresses"
+        );
+    } else {
+        panic!("Expected H3 variant, got: {}", protocols[0]);
+    }
+}
+
+#[tokio::test]
+async fn test_pool_manager_https_ip_no_resolution() {
+    let pool = UpstreamPool {
+        name: "test-https-ip".into(),
+        strategy: UpstreamStrategy::Parallel,
+        priority: 1,
+        servers: vec!["https://1.1.1.1/dns-query".into()],
+        weight: None,
+    };
+
+    let pm = PoolManager::new(vec![pool], None, QueryEventEmitter::new_disabled())
+        .await
+        .expect("PoolManager should create successfully");
+
+    let protocols = pm.get_all_protocols();
+    assert_eq!(protocols.len(), 1);
+
+    if let DnsProtocol::Https { resolved_addrs, .. } = &protocols[0] {
+        assert!(
+            resolved_addrs.is_empty(),
+            "HTTPS with IP literal should have empty resolved_addrs"
+        );
+    } else {
+        panic!("Expected Https variant, got: {}", protocols[0]);
+    }
 }

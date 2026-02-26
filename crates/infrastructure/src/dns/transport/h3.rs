@@ -53,10 +53,11 @@ pub struct H3Transport {
     hostname: String,
     port: u16,
     pool_key: String,
+    resolved_addrs: Vec<SocketAddr>,
 }
 
 impl H3Transport {
-    pub fn new(h3_url: String) -> Self {
+    pub fn new(h3_url: String, resolved_addrs: Vec<SocketAddr>) -> Self {
         let without_scheme = h3_url.strip_prefix("h3://").unwrap_or(&h3_url);
         let host_part = without_scheme.split('/').next().unwrap_or(without_scheme);
         let (hostname, port) = if let Some((h, p)) = host_part.rsplit_once(':') {
@@ -71,10 +72,14 @@ impl H3Transport {
             hostname,
             port,
             pool_key,
+            resolved_addrs,
         }
     }
 
     async fn resolve_addr(&self, timeout: Duration) -> Result<SocketAddr, DomainError> {
+        if let Some(addr) = self.resolved_addrs.first() {
+            return Ok(*addr);
+        }
         let target = format!("{}:{}", self.hostname, self.port);
         let mut addrs = tokio::time::timeout(timeout, tokio::net::lookup_host(target.clone()))
             .await

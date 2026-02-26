@@ -100,8 +100,14 @@ pub fn create_transport(protocol: &DnsProtocol) -> Result<Transport, DomainError
         }
 
         #[cfg(feature = "dns-over-https")]
-        DnsProtocol::Https { url, .. } => Ok(Transport::Https(https::HttpsTransport::new(
+        DnsProtocol::Https {
+            url,
+            hostname,
+            resolved_addrs,
+        } => Ok(Transport::Https(https::HttpsTransport::new(
             url.to_string(),
+            hostname.to_string(),
+            resolved_addrs.clone(),
         ))),
 
         #[cfg(not(feature = "dns-over-https"))]
@@ -123,7 +129,14 @@ pub fn create_transport(protocol: &DnsProtocol) -> Result<Transport, DomainError
         ))),
 
         #[cfg(feature = "dns-over-h3")]
-        DnsProtocol::H3 { url, .. } => Ok(Transport::H3(h3::H3Transport::new(url.to_string()))),
+        DnsProtocol::H3 {
+            url,
+            resolved_addrs,
+            ..
+        } => Ok(Transport::H3(h3::H3Transport::new(
+            url.to_string(),
+            resolved_addrs.clone(),
+        ))),
 
         #[cfg(not(feature = "dns-over-h3"))]
         DnsProtocol::H3 { url, .. } => Err(DomainError::InvalidDomainName(format!(
