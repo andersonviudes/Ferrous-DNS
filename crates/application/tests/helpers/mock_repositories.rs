@@ -1246,8 +1246,8 @@ impl DnsResolutionBuilder {
             upstream_server: self.upstream_server,
             upstream_pool: None,
             min_ttl: None,
-            authority_data: None,
-            raw_upstream_data: None,
+            negative_soa_ttl: None,
+            upstream_wire_data: None,
         }
     }
 }

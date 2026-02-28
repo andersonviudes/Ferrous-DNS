@@ -4,13 +4,14 @@ use super::health::HealthChecker;
 use super::parallel::ParallelStrategy;
 use super::strategy::{QueryContext, Strategy, UpstreamResult};
 use crate::dns::events::QueryEventEmitter;
-use crate::dns::forwarding::ResponseParser;
+use crate::dns::forwarding::{MessageBuilder, ResponseParser};
 use crate::dns::transport::resolver;
 use ferrous_dns_domain::{
     Config, DnsProtocol, DomainError, RecordType, UpstreamPool, UpstreamStrategy,
 };
 use smallvec::SmallVec;
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
@@ -24,9 +25,9 @@ pub struct PoolManager {
 struct PoolWithStrategy {
     config: UpstreamPool,
     strategy: Strategy,
-    server_protocols: Vec<DnsProtocol>,
+    server_protocols: Vec<Arc<DnsProtocol>>,
     name_arc: Arc<str>,
-    server_displays: HashMap<String, Arc<str>>,
+    server_displays: Arc<HashMap<Arc<DnsProtocol>, Arc<str>>>,
 }
 
 impl PoolManager {
@@ -63,18 +64,18 @@ impl PoolManager {
             let expanded = Self::expand_hostnames(parsed).await;
 
             let name_arc: Arc<str> = Arc::from(pool.name.as_str());
-            let server_displays: HashMap<String, Arc<str>> = expanded
-                .iter()
-                .map(|p| {
-                    let s = p.to_string();
-                    let arc: Arc<str> = Arc::from(s.as_str());
-                    (s, arc)
-                })
-                .collect();
+            let server_protocols: Vec<Arc<DnsProtocol>> =
+                expanded.into_iter().map(Arc::new).collect();
+            let server_displays: Arc<HashMap<Arc<DnsProtocol>, Arc<str>>> = Arc::new(
+                server_protocols
+                    .iter()
+                    .map(|p| (Arc::clone(p), Arc::from(p.to_string())))
+                    .collect(),
+            );
             pools_with_strategy.push(PoolWithStrategy {
                 config: pool,
                 strategy,
-                server_protocols: expanded,
+                server_protocols,
                 name_arc,
                 server_displays,
             });
@@ -106,8 +107,13 @@ impl PoolManager {
                         };
                         match resolver::resolve_all(&hostname, port, Duration::from_secs(5)).await {
                             Ok(addrs) => {
-                                info!("{} resolved to {} upstream servers", hostname, addrs.len());
-                                for addr in &addrs {
+                                let limited = Self::limit_resolved_addrs(addrs);
+                                info!(
+                                    "{} resolved to {} upstream servers (limited to 1 IPv4 + 1 IPv6)",
+                                    hostname,
+                                    limited.len()
+                                );
+                                for addr in &limited {
                                     let resolved = protocol.with_resolved_addr(*addr);
                                     info!("  → {}", resolved);
                                     expanded.push(resolved);
@@ -130,11 +136,12 @@ impl PoolManager {
                         match resolver::resolve_all(clean_host, port, Duration::from_secs(5)).await
                         {
                             Ok(addrs) => {
-                                info!("{} pre-resolved to {} addresses", clean_host, addrs.len());
-                                for addr in &addrs {
+                                let limited = Self::limit_resolved_addrs(addrs);
+                                info!("{} pre-resolved to {} addresses", clean_host, limited.len());
+                                for addr in &limited {
                                     info!("  → {}", addr);
                                 }
-                                expanded.push(protocol.with_resolved_addrs(addrs));
+                                expanded.push(protocol.with_resolved_addrs(limited));
                             }
                             Err(e) => {
                                 warn!(
@@ -152,6 +159,22 @@ impl PoolManager {
             }
         }
         expanded
+    }
+
+    fn limit_resolved_addrs(addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
+        let mut ipv4 = None;
+        let mut ipv6 = None;
+        for addr in addrs {
+            if addr.is_ipv4() && ipv4.is_none() {
+                ipv4 = Some(addr);
+            } else if addr.is_ipv6() && ipv6.is_none() {
+                ipv6 = Some(addr);
+            }
+            if ipv4.is_some() && ipv6.is_some() {
+                break;
+            }
+        }
+        ipv4.into_iter().chain(ipv6).collect()
     }
 
     fn extract_port_from_hostname(hostname: &str, default: u16) -> u16 {
@@ -172,18 +195,21 @@ impl PoolManager {
 
     pub async fn query(
         &self,
-        domain: &str,
+        domain: &Arc<str>,
         record_type: &RecordType,
         timeout_ms: u64,
         dnssec_ok: bool,
     ) -> Result<UpstreamResult, DomainError> {
         debug!(
             total_pools = self.pools.len(),
-            domain, "Starting load balancer query"
+            %domain, "Starting load balancer query"
         );
 
+        let query_bytes: Arc<[u8]> =
+            Arc::from(MessageBuilder::build_query(domain, record_type, dnssec_ok)?);
+
         for pool in &self.pools {
-            let healthy_refs: SmallVec<[&DnsProtocol; 16]> =
+            let healthy_refs: SmallVec<[&Arc<DnsProtocol>; 16]> =
                 if let Some(ref checker) = self.health_checker {
                     pool.server_protocols
                         .iter()
@@ -203,7 +229,7 @@ impl PoolManager {
                 domain,
                 record_type,
                 timeout_ms,
-                dnssec_ok,
+                query_bytes: Arc::clone(&query_bytes),
                 emitter: &self.emitter,
                 pool_name: &pool.name_arc,
                 server_displays: &pool.server_displays,
@@ -235,10 +261,17 @@ impl PoolManager {
             .collect()
     }
 
-    pub fn get_all_protocols(&self) -> Vec<DnsProtocol> {
+    pub fn get_all_arc_protocols(&self) -> Vec<Arc<DnsProtocol>> {
         self.pools
             .iter()
             .flat_map(|p| p.server_protocols.iter().cloned())
+            .collect()
+    }
+
+    pub fn get_all_protocols(&self) -> Vec<DnsProtocol> {
+        self.pools
+            .iter()
+            .flat_map(|p| p.server_protocols.iter().map(|p| (**p).clone()))
             .collect()
     }
 }

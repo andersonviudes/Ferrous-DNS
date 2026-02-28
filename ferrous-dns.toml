@@ -65,18 +65,18 @@ cache_lfuk_history_size = 10            # Number of recent access timestamps tra
 # Each pool groups one or more upstream servers with a resolution strategy.
 # Lower priority value = higher priority when multiple pools are available.
 
-[[dns.pools]]
-name = "adguard"
-strategy = "Parallel"
-priority = 1
-servers = [
-    "h3://dns.adguard-dns.com/dns-query",
-]
+#[[dns.pools]]
+#name = "adguard"
+#strategy = "Parallel"
+#priority = 1
+#servers = [
+#    "h3://dns.adguard-dns.com/dns-query",
+#]
 
 [[dns.pools]]
 name = "cloudflare"
 strategy = "Failover"
-priority = 2
+priority = 1
 servers = [
     "https://cloudflare-dns.com/dns-query",
 ]

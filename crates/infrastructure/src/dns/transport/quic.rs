@@ -8,7 +8,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 use tracing::debug;
 
-type PoolKey = (SocketAddr, String);
+type PoolKey = (SocketAddr, Arc<str>);
 
 static SHARED_QUIC_CLIENT_CONFIG: LazyLock<quinn::ClientConfig> = LazyLock::new(|| {
     let mut root_store = rustls::RootCertStore::empty();
@@ -21,7 +21,11 @@ static SHARED_QUIC_CLIENT_CONFIG: LazyLock<quinn::ClientConfig> = LazyLock::new(
     tls_config.resumption = rustls::client::Resumption::in_memory_sessions(64);
     let quic_config = quinn::crypto::rustls::QuicClientConfig::try_from(Arc::new(tls_config))
         .expect("valid QUIC TLS config");
-    quinn::ClientConfig::new(Arc::new(quic_config))
+    let mut transport_config = quinn::TransportConfig::default();
+    transport_config.keep_alive_interval(Some(Duration::from_secs(15)));
+    let mut client_config = quinn::ClientConfig::new(Arc::new(quic_config));
+    client_config.transport_config(Arc::new(transport_config));
+    client_config
 });
 
 static QUIC_ENDPOINT_V4: LazyLock<quinn::Endpoint> = LazyLock::new(|| {
@@ -70,16 +74,22 @@ impl QuicTransport {
         })
     }
 
-    async fn get_or_connect(&self, timeout: Duration) -> Result<quinn::Connection, DomainError> {
+    fn pool_key(&self) -> Result<PoolKey, DomainError> {
         let server_addr = self.resolved_addr()?;
-        let key = (server_addr, self.hostname.to_string());
-        if let Some(conn) = QUIC_POOL.get(&key) {
-            if conn.close_reason().is_none() {
-                return Ok(conn.clone());
+        Ok((server_addr, Arc::clone(&self.hostname)))
+    }
+
+    async fn get_or_connect(&self, timeout: Duration) -> Result<quinn::Connection, DomainError> {
+        let key = self.pool_key()?;
+
+        if let Some(entry) = QUIC_POOL.get(&key) {
+            if entry.value().close_reason().is_none() {
+                return Ok(entry.value().clone());
             }
-            drop(conn);
+            drop(entry);
             QUIC_POOL.remove(&key);
         }
+
         let conn = self.connect_new(timeout).await?;
         QUIC_POOL.insert(key, conn.clone());
         Ok(conn)
@@ -161,6 +171,7 @@ impl DnsTransport for QuicTransport {
         message_bytes: &[u8],
         timeout: Duration,
     ) -> Result<TransportResponse, DomainError> {
+        let deadline = Instant::now() + timeout;
         let server_addr = self.resolved_addr()?;
         let conn = self.get_or_connect(timeout).await?;
 
@@ -173,16 +184,26 @@ impl DnsTransport for QuicTransport {
                 });
             }
             Err(_) => {
-                QUIC_POOL.remove(&(server_addr, self.hostname.to_string()));
+                if let Ok(key) = self.pool_key() {
+                    QUIC_POOL.remove(&key);
+                }
                 debug!(server = %server_addr, "QUIC connection stale, reconnecting");
             }
         }
 
-        let fresh_conn = self.connect_new(timeout).await?;
-        QUIC_POOL.insert((server_addr, self.hostname.to_string()), fresh_conn.clone());
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(DomainError::TransportTimeout {
+                server: server_addr.to_string(),
+            });
+        }
 
+        let conn = self.connect_new(remaining).await?;
+        QUIC_POOL.insert(self.pool_key()?, conn.clone());
+
+        let remaining = deadline.saturating_duration_since(Instant::now());
         let response_bytes =
-            Self::send_on_stream(&fresh_conn, message_bytes, timeout, server_addr).await?;
+            Self::send_on_stream(&conn, message_bytes, remaining, server_addr).await?;
 
         debug!(
             server = %server_addr,

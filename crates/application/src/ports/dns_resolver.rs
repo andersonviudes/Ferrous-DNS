@@ -1,6 +1,6 @@
 use async_trait::async_trait;
+use bytes::Bytes;
 use ferrous_dns_domain::{DnsQuery, DomainError};
-use std::any::Any;
 use std::net::IpAddr;
 use std::sync::{Arc, LazyLock};
 
@@ -16,8 +16,13 @@ pub struct DnsResolution {
     pub upstream_server: Option<Arc<str>>,
     pub upstream_pool: Option<Arc<str>>,
     pub min_ttl: Option<u32>,
-    pub authority_data: Option<Arc<dyn Any + Send + Sync>>,
-    pub raw_upstream_data: Option<Arc<dyn Any + Send + Sync>>,
+    /// SOA minimum TTL extracted from upstream authority records.
+    /// Used by cache layer to set TTL for negative responses.
+    pub negative_soa_ttl: Option<u32>,
+    /// Wire bytes of the complete upstream DNS response.
+    /// Opaque to the application layer — consumed by infrastructure
+    /// (DNS server handler, DNSSEC validator).
+    pub upstream_wire_data: Option<Bytes>,
 }
 
 impl DnsResolution {
@@ -31,8 +36,8 @@ impl DnsResolution {
             upstream_server: None,
             upstream_pool: None,
             min_ttl: None,
-            authority_data: None,
-            raw_upstream_data: None,
+            negative_soa_ttl: None,
+            upstream_wire_data: None,
         }
     }
 
@@ -50,8 +55,8 @@ impl DnsResolution {
             upstream_server: None,
             upstream_pool: None,
             min_ttl: None,
-            authority_data: None,
-            raw_upstream_data: None,
+            negative_soa_ttl: None,
+            upstream_wire_data: None,
         }
     }
 }

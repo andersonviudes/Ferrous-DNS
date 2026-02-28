@@ -59,11 +59,11 @@ impl DnsResolver for DnssecResolver {
         );
 
         let pre_fetched_message = resolution
-            .raw_upstream_data
+            .upstream_wire_data
             .as_ref()
-            .and_then(|data| data.downcast_ref::<Message>());
+            .and_then(|bytes| Message::from_vec(bytes).ok());
 
-        let dnssec_result = if let Some(message) = pre_fetched_message {
+        let dnssec_result = if let Some(ref message) = pre_fetched_message {
             debug!(
                 domain = %query.domain,
                 "Using pre-fetched upstream response for DNSSEC (skipping duplicate query)"

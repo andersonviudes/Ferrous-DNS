@@ -155,7 +155,7 @@ impl DnsServices {
         config: &Config,
     ) {
         if let Some(checker) = health_checker {
-            let all_protocols = pool_manager.get_all_protocols();
+            let all_protocols = pool_manager.get_all_arc_protocols();
             let checker_clone = checker.clone();
             let interval = config.dns.health_check.interval;
             let timeout = config.dns.health_check.timeout;

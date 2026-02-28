@@ -10,7 +10,6 @@ use std::sync::LazyLock;
 
 static EMPTY_ADDRESSES: LazyLock<Arc<Vec<IpAddr>>> = LazyLock::new(|| Arc::new(vec![]));
 use ferrous_dns_domain::{DnsQuery, DomainError};
-use hickory_proto::rr::{RData, Record};
 use rustc_hash::FxBuildHasher;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -91,8 +90,8 @@ impl CachedResolver {
                         upstream_server: None,
                         upstream_pool: None,
                         min_ttl: remaining_ttl,
-                        authority_data: None,
-                        raw_upstream_data: None,
+                        negative_soa_ttl: None,
+                        upstream_wire_data: None,
                     },
                     CachedData::CanonicalName(_) => DnsResolution {
                         addresses: Arc::clone(&EMPTY_ADDRESSES),
@@ -103,8 +102,8 @@ impl CachedResolver {
                         upstream_server: None,
                         upstream_pool: None,
                         min_ttl: remaining_ttl,
-                        authority_data: None,
-                        raw_upstream_data: None,
+                        negative_soa_ttl: None,
+                        upstream_wire_data: None,
                     },
                     CachedData::NegativeResponse => DnsResolution {
                         addresses: Arc::clone(&EMPTY_ADDRESSES),
@@ -115,18 +114,16 @@ impl CachedResolver {
                         upstream_server: None,
                         upstream_pool: None,
                         min_ttl: remaining_ttl,
-                        authority_data: None,
-                        raw_upstream_data: None,
+                        negative_soa_ttl: None,
+                        upstream_wire_data: None,
                     },
                 }
             },
         )
     }
 
-    fn insert_negative(&self, query: &DnsQuery, authority_records: &[Record]) {
-        let ttl = extract_negative_ttl(authority_records)
-            .map(clamp_negative_ttl)
-            .unwrap_or_else(|| self.negative_ttl_tracker.record_and_get_ttl(&query.domain));
+    fn insert_negative(&self, query: &DnsQuery) {
+        let ttl = self.negative_ttl_tracker.record_and_get_ttl(&query.domain);
         self.cache.insert(
             query.domain.as_ref(),
             query.record_type,
@@ -138,13 +135,16 @@ impl CachedResolver {
 
     fn store_in_cache(&self, query: &DnsQuery, resolution: &DnsResolution) {
         if resolution.addresses.is_empty() {
-            let authority_records = resolution
-                .authority_data
-                .as_ref()
-                .and_then(|data| data.downcast_ref::<Vec<Record>>());
-            self.insert_negative(
-                query,
-                authority_records.map(|v| v.as_slice()).unwrap_or(&[]),
+            let ttl = resolution
+                .negative_soa_ttl
+                .map(clamp_negative_ttl)
+                .unwrap_or_else(|| self.negative_ttl_tracker.record_and_get_ttl(&query.domain));
+            self.cache.insert(
+                query.domain.as_ref(),
+                query.record_type,
+                CachedData::NegativeResponse,
+                ttl,
+                Some(DnssecStatus::Insecure),
             );
         } else {
             let addresses = Arc::clone(&resolution.addresses);
@@ -203,8 +203,8 @@ impl CachedResolver {
                     upstream_server: None,
                     upstream_pool: None,
                     min_ttl: result.min_ttl,
-                    authority_data: None,
-                    raw_upstream_data: None,
+                    negative_soa_ttl: None,
+                    upstream_wire_data: None,
                 });
             }
         }
@@ -219,8 +219,8 @@ impl CachedResolver {
                 upstream_server: None,
                 upstream_pool: None,
                 min_ttl: result.min_ttl,
-                authority_data: None,
-                raw_upstream_data: None,
+                negative_soa_ttl: None,
+                upstream_wire_data: None,
             });
         }
 
@@ -267,7 +267,7 @@ impl CachedResolver {
                 }
             }
             Err(_) => {
-                self.insert_negative(query, &[]);
+                self.insert_negative(query);
                 if let Some((_, tx)) = self.inflight.remove(&key) {
                     let _ = tx.send(None);
                 }
@@ -303,16 +303,6 @@ impl DnsResolver for CachedResolver {
 
         self.resolve_as_leader(query, key).await
     }
-}
-
-fn extract_negative_ttl(authority_records: &[Record]) -> Option<u32> {
-    authority_records.iter().find_map(|r| {
-        if let RData::SOA(soa) = r.data() {
-            Some(soa.minimum().min(r.ttl()))
-        } else {
-            None
-        }
-    })
 }
 
 fn clamp_negative_ttl(ttl: u32) -> u32 {

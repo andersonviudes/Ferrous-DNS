@@ -23,7 +23,7 @@ impl UpstreamHealthPort for UpstreamHealthAdapter {
         };
 
         self.pool_manager
-            .get_all_protocols()
+            .get_all_arc_protocols()
             .into_iter()
             .map(|protocol| {
                 let status = match checker.get_status(&protocol) {

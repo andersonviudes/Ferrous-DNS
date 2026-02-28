@@ -750,6 +750,7 @@ name = "ferrous-dns-application"
 version = "0.3.10"
 dependencies = [
  "async-trait",
+ "bytes",
  "chrono",
  "ferrous-dns-domain",
  "ipnetwork",

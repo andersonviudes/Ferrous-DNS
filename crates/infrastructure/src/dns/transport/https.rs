@@ -12,6 +12,7 @@ static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .use_rustls_tls()
         .pool_max_idle_per_host(4)
         .http2_prior_knowledge()
+        .tcp_keepalive(Duration::from_secs(15))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new())
 });
@@ -36,17 +37,22 @@ impl HttpsTransport {
     }
 
     fn get_or_create_client(hostname: &str, addrs: &[SocketAddr]) -> reqwest::Client {
+        if let Some(client) = HTTPS_CLIENT_POOL.get(hostname) {
+            return client.clone();
+        }
+
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .pool_max_idle_per_host(4)
+            .http2_prior_knowledge()
+            .tcp_keepalive(Duration::from_secs(15))
+            .resolve_to_addrs(hostname, addrs)
+            .build()
+            .unwrap_or_else(|_| SHARED_CLIENT.clone());
+
         HTTPS_CLIENT_POOL
             .entry(hostname.to_string())
-            .or_insert_with(|| {
-                reqwest::Client::builder()
-                    .use_rustls_tls()
-                    .pool_max_idle_per_host(4)
-                    .http2_prior_knowledge()
-                    .resolve_to_addrs(hostname, addrs)
-                    .build()
-                    .unwrap_or_else(|_| SHARED_CLIENT.clone())
-            })
+            .or_insert(client)
             .clone()
     }
 }

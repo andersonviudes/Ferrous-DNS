@@ -18,8 +18,26 @@ fn make_soa_record(zone: &str, minimum: u32, record_ttl: u32) -> Record {
     Record::from_rdata(name, record_ttl, RData::SOA(soa))
 }
 
+fn extract_soa_ttl(records: &[Record]) -> Option<u32> {
+    records.iter().find_map(|r| {
+        if let RData::SOA(soa) = r.data() {
+            Some(soa.minimum().min(r.ttl()))
+        } else {
+            None
+        }
+    })
+}
+
 struct MockNegativeResolver {
-    authority_records: Vec<Record>,
+    negative_soa_ttl: Option<u32>,
+}
+
+impl MockNegativeResolver {
+    fn from_authority(authority_records: &[Record]) -> Self {
+        Self {
+            negative_soa_ttl: extract_soa_ttl(authority_records),
+        }
+    }
 }
 
 #[async_trait]
@@ -34,10 +52,8 @@ impl DnsResolver for MockNegativeResolver {
             upstream_server: None,
             upstream_pool: None,
             min_ttl: None,
-            authority_data: Some(
-                Arc::new(self.authority_records.clone()) as Arc<dyn std::any::Any + Send + Sync>
-            ),
-            raw_upstream_data: None,
+            negative_soa_ttl: self.negative_soa_ttl,
+            upstream_wire_data: None,
         })
     }
 }
@@ -65,9 +81,7 @@ fn make_cache() -> Arc<DnsCache> {
 #[tokio::test]
 async fn test_soa_ttl_used_when_present() {
     let soa = make_soa_record("example.com", 300, 300);
-    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver {
-        authority_records: vec![soa],
-    });
+    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver::from_authority(&[soa]));
 
     let cache = make_cache();
     let resolver = CachedResolver::new(
@@ -97,9 +111,7 @@ async fn test_soa_ttl_used_when_present() {
 #[tokio::test]
 async fn test_soa_ttl_below_min_clamped_to_30() {
     let soa = make_soa_record("example.com", 10, 10);
-    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver {
-        authority_records: vec![soa],
-    });
+    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver::from_authority(&[soa]));
 
     let cache = make_cache();
     let resolver = CachedResolver::new(
@@ -127,9 +139,7 @@ async fn test_soa_ttl_below_min_clamped_to_30() {
 #[tokio::test]
 async fn test_soa_ttl_above_max_clamped_to_3600() {
     let soa = make_soa_record("example.com", 86400, 86400);
-    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver {
-        authority_records: vec![soa],
-    });
+    let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver::from_authority(&[soa]));
 
     let cache = make_cache();
     let resolver = CachedResolver::new(
@@ -157,7 +167,7 @@ async fn test_soa_ttl_above_max_clamped_to_3600() {
 #[tokio::test]
 async fn test_fallback_to_tracker_when_no_soa() {
     let inner: Arc<dyn DnsResolver> = Arc::new(MockNegativeResolver {
-        authority_records: vec![],
+        negative_soa_ttl: None,
     });
 
     let cache = make_cache();
