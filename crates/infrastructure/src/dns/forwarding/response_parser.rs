@@ -120,29 +120,15 @@ impl ResponseParser {
     }
 
     pub fn is_transport_error(error: &DomainError) -> bool {
-        if matches!(
+        matches!(
             error,
             DomainError::TransportTimeout { .. }
                 | DomainError::TransportConnectionRefused { .. }
                 | DomainError::TransportConnectionReset { .. }
                 | DomainError::TransportNoHealthyServers
                 | DomainError::TransportAllServersUnreachable
-        ) {
-            return true;
-        }
-
-        if let DomainError::InvalidDomainName(msg) = error {
-            let h = msg.as_bytes();
-            return contains_ascii_ci(h, b"timeout")
-                || contains_ascii_ci(h, b"timed out")
-                || contains_ascii_ci(h, b"connection refused")
-                || contains_ascii_ci(h, b"connection reset")
-                || contains_ascii_ci(h, b"connection error")
-                || contains_ascii_ci(h, b"network unreachable")
-                || contains_ascii_ci(h, b"host unreachable");
-        }
-
-        false
+                | DomainError::IoError(_)
+        )
     }
 
     pub fn rcode_to_status(rcode: ResponseCode) -> &'static str {
@@ -156,10 +142,4 @@ impl ResponseParser {
             _ => "UNKNOWN",
         }
     }
-}
-
-fn contains_ascii_ci(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|w| w.eq_ignore_ascii_case(needle))
 }

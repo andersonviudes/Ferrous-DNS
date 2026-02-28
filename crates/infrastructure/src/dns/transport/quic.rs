@@ -50,7 +50,10 @@ fn quic_endpoint_for(addr: &SocketAddr) -> &'static quinn::Endpoint {
     }
 }
 
-static QUIC_POOL: LazyLock<DashMap<PoolKey, quinn::Connection>> = LazyLock::new(DashMap::new);
+const QUIC_CONN_TTL: Duration = Duration::from_secs(300);
+
+static QUIC_POOL: LazyLock<DashMap<PoolKey, (quinn::Connection, Instant)>> =
+    LazyLock::new(DashMap::new);
 
 pub struct QuicTransport {
     upstream_addr: UpstreamAddr,
@@ -67,7 +70,7 @@ impl QuicTransport {
 
     fn resolved_addr(&self) -> Result<SocketAddr, DomainError> {
         self.upstream_addr.socket_addr().ok_or_else(|| {
-            DomainError::InvalidDomainName(format!(
+            DomainError::IoError(format!(
                 "QUIC transport requires resolved address, got: {}",
                 self.upstream_addr
             ))
@@ -83,16 +86,31 @@ impl QuicTransport {
         let key = self.pool_key()?;
 
         if let Some(entry) = QUIC_POOL.get(&key) {
-            if entry.value().close_reason().is_none() {
-                return Ok(entry.value().clone());
+            let (conn, created_at) = entry.value();
+            if created_at.elapsed() < QUIC_CONN_TTL && conn.close_reason().is_none() {
+                return Ok(conn.clone());
             }
             drop(entry);
             QUIC_POOL.remove(&key);
         }
 
         let conn = self.connect_new(timeout).await?;
-        QUIC_POOL.insert(key, conn.clone());
-        Ok(conn)
+        let now = Instant::now();
+        match QUIC_POOL.entry(key) {
+            dashmap::Entry::Occupied(e) => {
+                let (existing, created_at) = e.get();
+                if created_at.elapsed() < QUIC_CONN_TTL && existing.close_reason().is_none() {
+                    Ok(existing.clone())
+                } else {
+                    e.replace_entry((conn.clone(), now));
+                    Ok(conn)
+                }
+            }
+            dashmap::Entry::Vacant(e) => {
+                e.insert((conn.clone(), now));
+                Ok(conn)
+            }
+        }
     }
 
     async fn connect_new(&self, timeout: Duration) -> Result<quinn::Connection, DomainError> {
@@ -102,7 +120,7 @@ impl QuicTransport {
         let connecting = endpoint
             .connect(server_addr, self.hostname.as_ref())
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Failed to initiate QUIC connection to {}: {}",
                     server_addr, e
                 ))
@@ -132,7 +150,7 @@ impl QuicTransport {
                 server: server_addr.to_string(),
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Failed to open QUIC stream to {}: {}",
                     server_addr, e
                 ))
@@ -199,7 +217,7 @@ impl DnsTransport for QuicTransport {
         }
 
         let conn = self.connect_new(remaining).await?;
-        QUIC_POOL.insert(self.pool_key()?, conn.clone());
+        QUIC_POOL.insert(self.pool_key()?, (conn.clone(), Instant::now()));
 
         let remaining = deadline.saturating_duration_since(Instant::now());
         let response_bytes =

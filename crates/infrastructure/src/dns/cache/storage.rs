@@ -6,7 +6,6 @@ use super::l1::{l1_clear, l1_get, l1_insert};
 use super::negative_cache::NegativeDnsCache;
 use super::port::DnsCacheAccess;
 use super::{CacheMetrics, CachedData, CachedRecord, DnssecStatus};
-use compact_str::CompactString;
 use dashmap::{DashMap, DashSet};
 use ferrous_dns_domain::RecordType;
 use rustc_hash::FxBuildHasher;
@@ -83,7 +82,7 @@ pub struct DnsCache {
     permanent_keys: Arc<DashSet<CacheKey, FxBuildHasher>>,
     min_ttl: u32,
     max_ttl: u32,
-    stale_refresh_tx: OnceLock<mpsc::Sender<(CompactString, RecordType)>>,
+    stale_refresh_tx: OnceLock<mpsc::Sender<(Arc<str>, RecordType)>>,
 }
 
 impl DnsCache {
@@ -203,10 +202,11 @@ impl DnsCache {
                     .stale_hits
                     .fetch_add(1, AtomicOrdering::Relaxed);
                 record.record_hit();
-                if record.try_set_refreshing() {
-                    if let Some(tx) = self.stale_refresh_tx.get() {
-                        let _ = tx
-                            .try_send((CompactString::from(key.domain.as_str()), key.record_type));
+                if let Some(tx) = self.stale_refresh_tx.get() {
+                    if record.try_set_refreshing()
+                        && tx.try_send((Arc::clone(domain), key.record_type)).is_err()
+                    {
+                        record.clear_refreshing();
                     }
                 }
                 return Some((
@@ -382,8 +382,10 @@ impl DnsCache {
         self.access_window_secs
     }
 
-    pub fn set_stale_refresh_sender(&self, tx: mpsc::Sender<(CompactString, RecordType)>) {
-        let _ = self.stale_refresh_tx.set(tx);
+    pub fn set_stale_refresh_sender(&self, tx: mpsc::Sender<(Arc<str>, RecordType)>) {
+        if self.stale_refresh_tx.set(tx).is_err() {
+            tracing::warn!("Stale refresh sender already configured — second sender dropped");
+        }
     }
 
     pub fn refresh_record(

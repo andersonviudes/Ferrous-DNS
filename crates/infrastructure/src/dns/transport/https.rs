@@ -97,16 +97,12 @@ impl DnsTransport for HttpsTransport {
                 .send(),
         )
         .await
-        .map_err(|_| {
-            DomainError::InvalidDomainName(format!("Timeout sending DoH query to {}", self.url))
-        })?
-        .map_err(|e| {
-            DomainError::InvalidDomainName(format!("DoH request to {} failed: {}", self.url, e))
-        })?;
+        .map_err(|_| DomainError::IoError(format!("Timeout sending DoH query to {}", self.url)))?
+        .map_err(|e| DomainError::IoError(format!("DoH request to {} failed: {}", self.url, e)))?;
 
         let status = response.status();
         if !status.is_success() {
-            return Err(DomainError::InvalidDomainName(format!(
+            return Err(DomainError::IoError(format!(
                 "DoH server {} returned HTTP {}: {}",
                 self.url,
                 status.as_u16(),
@@ -121,13 +117,10 @@ impl DnsTransport for HttpsTransport {
         let response_bytes = tokio::time::timeout(remaining, response.bytes())
             .await
             .map_err(|_| {
-                DomainError::InvalidDomainName(format!(
-                    "Timeout reading DoH response from {}",
-                    self.url
-                ))
+                DomainError::IoError(format!("Timeout reading DoH response from {}", self.url))
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Failed to read DoH response from {}: {}",
                     self.url, e
                 ))

@@ -27,7 +27,7 @@ impl TcpTransport {
 
     fn resolved_addr(&self) -> Result<SocketAddr, DomainError> {
         self.upstream_addr.socket_addr().ok_or_else(|| {
-            DomainError::InvalidDomainName(format!(
+            DomainError::IoError(format!(
                 "TCP transport requires resolved address, got: {}",
                 self.upstream_addr
             ))
@@ -51,20 +51,17 @@ impl TcpTransport {
         let stream = tokio::time::timeout(timeout, TcpStream::connect(server_addr))
             .await
             .map_err(|_| {
-                DomainError::InvalidDomainName(format!(
-                    "Timeout connecting to TCP server {}",
-                    server_addr
-                ))
+                DomainError::IoError(format!("Timeout connecting to TCP server {}", server_addr))
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Connection refused by TCP server {}: {}",
                     server_addr, e
                 ))
             })?;
 
         stream.set_nodelay(true).map_err(|e| {
-            DomainError::InvalidDomainName(format!(
+            DomainError::IoError(format!(
                 "Failed to set TCP_NODELAY on {}: {}",
                 server_addr, e
             ))
@@ -108,13 +105,13 @@ impl DnsTransport for TcpTransport {
                 tokio::time::timeout(timeout, send_with_length_prefix(&mut fresh, message_bytes))
                     .await
                     .map_err(|_| {
-                        DomainError::InvalidDomainName(format!(
+                        DomainError::IoError(format!(
                             "Timeout sending TCP query to {}",
                             server_addr
                         ))
                     })?
                     .map_err(|e| {
-                        DomainError::InvalidDomainName(format!(
+                        DomainError::IoError(format!(
                             "Failed to send TCP query to {}: {}",
                             server_addr, e
                         ))
@@ -134,7 +131,7 @@ impl DnsTransport for TcpTransport {
         })
         .await
         .map_err(|_| {
-            DomainError::InvalidDomainName(format!(
+            DomainError::IoError(format!(
                 "Timeout waiting for TCP response from {}",
                 server_addr
             ))
@@ -169,16 +166,18 @@ where
     let length = message_bytes.len() as u16;
     let length_bytes = length.to_be_bytes();
 
-    stream.write_all(&length_bytes).await.map_err(|e| {
-        DomainError::InvalidDomainName(format!("Failed to write length prefix: {}", e))
-    })?;
-    stream.write_all(message_bytes).await.map_err(|e| {
-        DomainError::InvalidDomainName(format!("Failed to write DNS message: {}", e))
-    })?;
+    stream
+        .write_all(&length_bytes)
+        .await
+        .map_err(|e| DomainError::IoError(format!("Failed to write length prefix: {}", e)))?;
+    stream
+        .write_all(message_bytes)
+        .await
+        .map_err(|e| DomainError::IoError(format!("Failed to write DNS message: {}", e)))?;
     stream
         .flush()
         .await
-        .map_err(|e| DomainError::InvalidDomainName(format!("Failed to flush stream: {}", e)))?;
+        .map_err(|e| DomainError::IoError(format!("Failed to flush stream: {}", e)))?;
 
     Ok(())
 }
@@ -188,23 +187,25 @@ where
     S: AsyncReadExt + Unpin,
 {
     let mut len_buf = [0u8; 2];
-    stream.read_exact(&mut len_buf).await.map_err(|e| {
-        DomainError::InvalidDomainName(format!("Failed to read response length: {}", e))
-    })?;
+    stream
+        .read_exact(&mut len_buf)
+        .await
+        .map_err(|e| DomainError::IoError(format!("Failed to read response length: {}", e)))?;
 
     let response_len = u16::from_be_bytes(len_buf) as usize;
 
     if response_len > MAX_TCP_MESSAGE_SIZE {
-        return Err(DomainError::InvalidDomainName(format!(
+        return Err(DomainError::IoError(format!(
             "Response too large: {} bytes (max {})",
             response_len, MAX_TCP_MESSAGE_SIZE
         )));
     }
 
     let mut response = vec![0u8; response_len];
-    stream.read_exact(&mut response).await.map_err(|e| {
-        DomainError::InvalidDomainName(format!("Failed to read response body: {}", e))
-    })?;
+    stream
+        .read_exact(&mut response)
+        .await
+        .map_err(|e| DomainError::IoError(format!("Failed to read response body: {}", e)))?;
 
     Ok(response)
 }

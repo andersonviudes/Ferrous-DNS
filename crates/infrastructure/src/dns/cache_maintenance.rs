@@ -1,7 +1,6 @@
 use super::cache::{coarse_clock, CachedAddresses, DnsCache};
 
 use async_trait::async_trait;
-use compact_str::CompactString;
 use ferrous_dns_application::ports::{
     CacheCompactionOutcome, CacheMaintenancePort, CacheRefreshOutcome, DnsResolver,
     QueryLogRepository,
@@ -116,39 +115,59 @@ impl DnsCacheMaintenance {
         }
     }
 
+    /// Spawns a background task that listens for stale cache keys and refreshes
+    /// them immediately upstream. The task ends when the channel sender is dropped.
     pub fn start_stale_listener(
         cache: Arc<DnsCache>,
         resolver: Arc<dyn DnsResolver>,
         query_log: Option<Arc<dyn QueryLogRepository>>,
-        mut rx: mpsc::Receiver<(CompactString, RecordType)>,
+        mut rx: mpsc::Receiver<(Arc<str>, RecordType)>,
     ) {
+        const MAX_CONCURRENT_REFRESHES: usize = 16;
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_REFRESHES));
+
         tokio::spawn(async move {
             loop {
                 match rx.recv().await {
                     Some((domain, record_type)) => {
-                        match Self::refresh_entry(
-                            &cache,
-                            &resolver,
-                            &query_log,
-                            &domain,
-                            &record_type,
-                        )
-                        .await
-                        {
-                            Ok(true) => {
-                                debug!(
-                                    domain = %domain,
-                                    record_type = %record_type,
-                                    "Stale entry refreshed immediately"
-                                );
+                        let permit = match semaphore.clone().acquire_owned().await {
+                            Ok(p) => p,
+                            Err(_) => break,
+                        };
+                        let cache = Arc::clone(&cache);
+                        let resolver = Arc::clone(&resolver);
+                        let query_log = query_log.clone();
+                        tokio::spawn(async move {
+                            match Self::refresh_entry(
+                                &cache,
+                                &resolver,
+                                &query_log,
+                                &domain,
+                                &record_type,
+                            )
+                            .await
+                            {
+                                Ok(true) => {
+                                    debug!(
+                                        domain = %domain,
+                                        record_type = %record_type,
+                                        "Stale entry refreshed immediately"
+                                    );
+                                }
+                                Ok(false) => {
+                                    cache.reset_refreshing(&domain, &record_type);
+                                }
+                                Err(e) => {
+                                    debug!(
+                                        domain = %domain,
+                                        error = %e,
+                                        "Stale refresh failed"
+                                    );
+                                    cache.reset_refreshing(&domain, &record_type);
+                                }
                             }
-                            Ok(false) => {
-                                cache.reset_refreshing(&domain, &record_type);
-                            }
-                            Err(_) => {
-                                cache.reset_refreshing(&domain, &record_type);
-                            }
-                        }
+                            drop(permit);
+                        });
                     }
                     None => {
                         info!("Stale refresh listener: channel closed, shutting down");

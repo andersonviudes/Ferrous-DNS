@@ -2,12 +2,11 @@ use crate::dns::forwarding::RecordTypeMapper;
 use ferrous_dns_application::use_cases::HandleDnsQueryUseCase;
 use ferrous_dns_domain::{DomainError, RecordType};
 use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
-use hickory_proto::rr::{Name, RData, Record};
+use hickory_proto::rr::{RData, Record};
 use hickory_proto::serialize::binary::{BinEncodable, BinEncoder};
 use hickory_server::authority::MessageResponseBuilder;
 use hickory_server::server::{Request, RequestHandler, ResponseHandler, ResponseInfo};
 use std::net::IpAddr;
-use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
 
@@ -57,29 +56,12 @@ impl DnsServerHandler {
         let resolution = match self.use_case.execute(&dns_request).await {
             Ok(res) => res,
             Err(DomainError::Blocked) => {
-                return Some(build_error_wire(
-                    query_id,
-                    rd,
-                    &queries,
-                    ResponseCode::Refused,
-                ))
+                return build_error_wire(query_id, rd, &queries, ResponseCode::Refused)
             }
             Err(DomainError::NxDomain) => {
-                return Some(build_error_wire(
-                    query_id,
-                    rd,
-                    &queries,
-                    ResponseCode::NXDomain,
-                ))
+                return build_error_wire(query_id, rd, &queries, ResponseCode::NXDomain)
             }
-            Err(_) => {
-                return Some(build_error_wire(
-                    query_id,
-                    rd,
-                    &queries,
-                    ResponseCode::ServFail,
-                ))
-            }
+            Err(_) => return build_error_wire(query_id, rd, &queries, ResponseCode::ServFail),
         };
 
         let ttl = resolution.min_ttl.unwrap_or(DEFAULT_TTL);
@@ -101,7 +83,7 @@ impl DnsServerHandler {
                 }
             }
         } else {
-            let record_name = Name::from_str(domain).unwrap_or_else(|_| Name::root());
+            let record_name = query_info.name().clone();
             for addr in addresses.iter() {
                 let rdata = match *addr {
                     IpAddr::V4(ipv4) => RData::A(hickory_proto::rr::rdata::A(ipv4)),
@@ -194,7 +176,7 @@ impl RequestHandler for DnsServerHandler {
             };
         }
 
-        let record_name = Name::from_str(domain_ref).unwrap_or_else(|_| Name::root());
+        let record_name: hickory_proto::rr::Name = query.name().clone().into();
 
         let builder = MessageResponseBuilder::from_message_request(request);
         let mut answers = Vec::with_capacity(addresses.len());
@@ -233,7 +215,7 @@ fn build_error_wire(
     rd: bool,
     queries: &[hickory_proto::op::Query],
     code: ResponseCode,
-) -> Vec<u8> {
+) -> Option<Vec<u8>> {
     let mut resp = Message::new(id, MessageType::Response, OpCode::Query);
     resp.set_recursion_desired(rd);
     resp.set_recursion_available(true);
@@ -241,7 +223,7 @@ fn build_error_wire(
     for q in queries {
         resp.add_query(q.clone());
     }
-    encode_message(&resp).unwrap_or_default()
+    encode_message(&resp)
 }
 
 async fn send_error_response<R: ResponseHandler>(

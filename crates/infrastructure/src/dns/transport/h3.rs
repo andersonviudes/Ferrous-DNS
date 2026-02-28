@@ -50,7 +50,9 @@ fn h3_endpoint_for(addr: &SocketAddr) -> &'static quinn::Endpoint {
     }
 }
 
-static H3_POOL: LazyLock<DashMap<Arc<str>, H3SendRequest>> = LazyLock::new(DashMap::new);
+const H3_CONN_TTL: Duration = Duration::from_secs(300);
+
+static H3_POOL: LazyLock<DashMap<Arc<str>, (H3SendRequest, Instant)>> = LazyLock::new(DashMap::new);
 
 pub struct H3Transport {
     https_url: String,
@@ -91,14 +93,11 @@ impl H3Transport {
                 server: target.clone(),
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
-                    "DNS resolution failed for {}: {}",
-                    target, e
-                ))
+                DomainError::IoError(format!("DNS resolution failed for {}: {}", target, e))
             })?;
-        addrs.next().ok_or_else(|| {
-            DomainError::InvalidDomainName(format!("No address found for {}", target))
-        })
+        addrs
+            .next()
+            .ok_or_else(|| DomainError::IoError(format!("No address found for {}", target)))
     }
 
     async fn connect_new(&self, timeout: Duration) -> Result<H3SendRequest, DomainError> {
@@ -106,7 +105,7 @@ impl H3Transport {
         let endpoint = h3_endpoint_for(&addr);
 
         let connecting = endpoint.connect(addr, &self.hostname).map_err(|e| {
-            DomainError::InvalidDomainName(format!(
+            DomainError::IoError(format!(
                 "Failed to initiate H3 connection to {}: {}",
                 addr, e
             ))
@@ -123,10 +122,7 @@ impl H3Transport {
 
         let h3_conn = h3_quinn::Connection::new(quinn_conn);
         let (mut driver, send_request) = h3::client::new(h3_conn).await.map_err(|e| {
-            DomainError::InvalidDomainName(format!(
-                "Failed to create H3 client for {}: {}",
-                addr, e
-            ))
+            DomainError::IoError(format!("Failed to create H3 client for {}: {}", addr, e))
         })?;
 
         tokio::spawn(async move {
@@ -138,11 +134,30 @@ impl H3Transport {
 
     async fn get_or_connect(&self, timeout: Duration) -> Result<H3SendRequest, DomainError> {
         if let Some(entry) = H3_POOL.get(&self.pool_key) {
-            return Ok(entry.value().clone());
+            let (request, created_at) = entry.value();
+            if created_at.elapsed() < H3_CONN_TTL {
+                return Ok(request.clone());
+            }
+            drop(entry);
+            H3_POOL.remove(&self.pool_key);
         }
         let request = self.connect_new(timeout).await?;
-        H3_POOL.insert(Arc::clone(&self.pool_key), request.clone());
-        Ok(request)
+        let now = Instant::now();
+        match H3_POOL.entry(Arc::clone(&self.pool_key)) {
+            dashmap::Entry::Occupied(e) => {
+                let (existing, created_at) = e.get();
+                if created_at.elapsed() < H3_CONN_TTL {
+                    Ok(existing.clone())
+                } else {
+                    e.replace_entry((request.clone(), now));
+                    Ok(request)
+                }
+            }
+            dashmap::Entry::Vacant(e) => {
+                e.insert((request.clone(), now));
+                Ok(request)
+            }
+        }
     }
 
     async fn execute_request(
@@ -159,9 +174,7 @@ impl H3Transport {
             .header("content-type", "application/dns-message")
             .header("accept", "application/dns-message")
             .body(())
-            .map_err(|e| {
-                DomainError::InvalidDomainName(format!("Failed to build H3 request: {}", e))
-            })?;
+            .map_err(|e| DomainError::IoError(format!("Failed to build H3 request: {}", e)))?;
 
         let mut stream = tokio::time::timeout(timeout, send_request.send_request(request))
             .await
@@ -169,10 +182,7 @@ impl H3Transport {
                 server: https_url.to_string(),
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
-                    "Failed to send H3 request to {}: {}",
-                    https_url, e
-                ))
+                DomainError::IoError(format!("Failed to send H3 request to {}: {}", https_url, e))
             })?;
 
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -185,10 +195,7 @@ impl H3Transport {
             server: https_url.to_string(),
         })?
         .map_err(|e| {
-            DomainError::InvalidDomainName(format!(
-                "Failed to send H3 data to {}: {}",
-                https_url, e
-            ))
+            DomainError::IoError(format!("Failed to send H3 data to {}: {}", https_url, e))
         })?;
 
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -198,7 +205,7 @@ impl H3Transport {
                 server: https_url.to_string(),
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Failed to finish H3 stream to {}: {}",
                     https_url, e
                 ))
@@ -211,14 +218,14 @@ impl H3Transport {
                 server: https_url.to_string(),
             })?
             .map_err(|e| {
-                DomainError::InvalidDomainName(format!(
+                DomainError::IoError(format!(
                     "Failed to receive H3 response from {}: {}",
                     https_url, e
                 ))
             })?;
 
         if !response.status().is_success() {
-            return Err(DomainError::InvalidDomainName(format!(
+            return Err(DomainError::IoError(format!(
                 "H3 server {} returned HTTP {}",
                 https_url,
                 response.status().as_u16()
@@ -234,7 +241,7 @@ impl H3Transport {
                     server: https_url.to_string(),
                 })?
                 .map_err(|e| {
-                    DomainError::InvalidDomainName(format!(
+                    DomainError::IoError(format!(
                         "Failed to read H3 body from {}: {}",
                         https_url, e
                     ))
@@ -282,7 +289,10 @@ impl DnsTransport for H3Transport {
         }
 
         let mut fresh_request = self.connect_new(remaining).await?;
-        H3_POOL.insert(Arc::clone(&self.pool_key), fresh_request.clone());
+        H3_POOL.insert(
+            Arc::clone(&self.pool_key),
+            (fresh_request.clone(), Instant::now()),
+        );
 
         let remaining = deadline.saturating_duration_since(Instant::now());
         let response_bytes = Self::execute_request(

@@ -54,7 +54,7 @@ fn test_stale_entry_sends_to_refresh_channel() {
     let msg = rx.try_recv();
     assert!(msg.is_ok(), "Stale hit must send domain to refresh channel");
     let (domain, record_type) = msg.unwrap();
-    assert_eq!(domain.as_str(), "stale-chan.com");
+    assert_eq!(&*domain, "stale-chan.com");
     assert_eq!(record_type, RecordType::CNAME);
 
     let stale_hits = cache.metrics().stale_hits.load(Ordering::Relaxed);

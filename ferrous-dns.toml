@@ -77,7 +77,7 @@ servers = [
 ]
 
 [[dns.pools]]
-name = "pool_fallback"
+name = "pool2"
 strategy = "Failover"
 priority = 2
 servers = [
