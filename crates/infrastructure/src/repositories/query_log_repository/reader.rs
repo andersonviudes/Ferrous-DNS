@@ -55,7 +55,11 @@ pub(super) async fn get_recent_paged(
 ) -> Result<(Vec<QueryLog>, u64, Option<i64>), DomainError> {
     debug!(
         limit,
-        offset, period_hours, cursor, ?domain, "Fetching paginated queries"
+        offset,
+        period_hours,
+        cursor,
+        ?domain,
+        "Fetching paginated queries"
     );
 
     let fetch_limit = limit as i64 + 1;

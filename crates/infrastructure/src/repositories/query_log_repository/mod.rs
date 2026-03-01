@@ -102,8 +102,7 @@ impl QueryLogRepository for SqliteQueryLogRepository {
         cursor: Option<i64>,
         domain: Option<&str>,
     ) -> Result<(Vec<QueryLog>, u64, Option<i64>), DomainError> {
-        reader::get_recent_paged(&self.read_pool, limit, offset, period_hours, cursor, domain)
-            .await
+        reader::get_recent_paged(&self.read_pool, limit, offset, period_hours, cursor, domain).await
     }
 
     async fn get_stats(&self, period_hours: f32) -> Result<QueryStats, DomainError> {
