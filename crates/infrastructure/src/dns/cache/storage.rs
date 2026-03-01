@@ -218,7 +218,9 @@ impl DnsCache {
 
             if record.is_expired_at_secs(now_secs) {
                 record.mark_for_deletion();
-                self.metrics.lazy_deletions.fetch_add(1, AtomicOrdering::Relaxed);
+                self.metrics
+                    .lazy_deletions
+                    .fetch_add(1, AtomicOrdering::Relaxed);
                 drop(entry);
             } else {
                 self.metrics.hits.fetch_add(1, AtomicOrdering::Relaxed);
@@ -276,7 +278,9 @@ impl DnsCache {
             dashmap::Entry::Vacant(e) => {
                 self.bloom.set(e.key());
                 e.insert(record);
-                self.metrics.insertions.fetch_add(1, AtomicOrdering::Relaxed);
+                self.metrics
+                    .insertions
+                    .fetch_add(1, AtomicOrdering::Relaxed);
             }
             dashmap::Entry::Occupied(mut e) => {
                 e.insert(record);
@@ -585,13 +589,19 @@ impl DnsCache {
         };
 
         let total_evicted = (scored_evicted + retain_removed) as u64;
-        self.metrics.evictions.fetch_add(total_evicted, AtomicOrdering::Relaxed);
-        self.metrics.batch_evictions.fetch_add(1, AtomicOrdering::Relaxed);
+        self.metrics
+            .evictions
+            .fetch_add(total_evicted, AtomicOrdering::Relaxed);
+        self.metrics
+            .batch_evictions
+            .fetch_add(1, AtomicOrdering::Relaxed);
 
         if self.adaptive_thresholds && last_worst_score < f64::MAX {
             let current = self.get_threshold();
             self.set_threshold((current * 0.9) + (last_worst_score * 0.1));
-            self.metrics.adaptive_adjustments.fetch_add(1, AtomicOrdering::Relaxed);
+            self.metrics
+                .adaptive_adjustments
+                .fetch_add(1, AtomicOrdering::Relaxed);
         }
     }
 }
