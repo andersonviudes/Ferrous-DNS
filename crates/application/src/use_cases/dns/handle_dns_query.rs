@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::net::IpAddr;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const LAST_SEEN_CAPACITY: usize = 8_192;
 
@@ -186,8 +186,8 @@ impl HandleDnsQueryUseCase {
     }
 
     pub async fn execute(&self, request: &DnsRequest) -> Result<DnsResolution, DomainError> {
-        let start = Instant::now();
-        let elapsed_us = || start.elapsed().as_micros() as u64;
+        let start_ns = coarse_now_ns();
+        let elapsed_us = || coarse_now_ns().saturating_sub(start_ns) / 1_000;
 
         self.maybe_track_client(request.client_ip);
 
