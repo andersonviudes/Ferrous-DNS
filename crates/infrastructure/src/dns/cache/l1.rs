@@ -34,6 +34,7 @@ thread_local! {
         });
 }
 
+/// Looks up a domain in the thread-local L1 cache, returning addresses and remaining TTL.
 #[inline]
 pub fn l1_get(domain: &str, record_type: &RecordType) -> Option<L1Hit> {
     let type_str = record_type.as_str();
@@ -81,6 +82,7 @@ fn lookup_l1(key_str: &str) -> Option<L1Hit> {
     })
 }
 
+/// Inserts a resolved entry into the thread-local L1 cache with an expiration timestamp.
 #[inline]
 pub fn l1_insert(
     domain: &str,
