@@ -41,12 +41,12 @@ fn build_dns_query(id: u16, domain: &str, qtype: u16) -> Vec<u8> {
     let mut buf = Vec::with_capacity(512);
 
     // Header
-    buf.extend_from_slice(&id.to_be_bytes());           // ID
-    buf.extend_from_slice(&[0x01, 0x00]);               // Flags: RD=1
-    buf.extend_from_slice(&[0x00, 0x01]);               // QDCOUNT = 1
-    buf.extend_from_slice(&[0x00, 0x00]);               // ANCOUNT = 0
-    buf.extend_from_slice(&[0x00, 0x00]);               // NSCOUNT = 0
-    buf.extend_from_slice(&[0x00, 0x00]);               // ARCOUNT = 0
+    buf.extend_from_slice(&id.to_be_bytes()); // ID
+    buf.extend_from_slice(&[0x01, 0x00]); // Flags: RD=1
+    buf.extend_from_slice(&[0x00, 0x01]); // QDCOUNT = 1
+    buf.extend_from_slice(&[0x00, 0x00]); // ANCOUNT = 0
+    buf.extend_from_slice(&[0x00, 0x00]); // NSCOUNT = 0
+    buf.extend_from_slice(&[0x00, 0x00]); // ARCOUNT = 0
 
     // Question — encode domain as DNS labels
     for label in domain.trim_end_matches('.').split('.') {
@@ -54,10 +54,10 @@ fn build_dns_query(id: u16, domain: &str, qtype: u16) -> Vec<u8> {
         buf.push(bytes.len() as u8);
         buf.extend_from_slice(bytes);
     }
-    buf.push(0x00);                                     // root label
+    buf.push(0x00); // root label
 
-    buf.extend_from_slice(&qtype.to_be_bytes());        // QTYPE
-    buf.extend_from_slice(&[0x00, 0x01]);               // QCLASS = IN
+    buf.extend_from_slice(&qtype.to_be_bytes()); // QTYPE
+    buf.extend_from_slice(&[0x00, 0x01]); // QCLASS = IN
 
     buf
 }
@@ -77,7 +77,10 @@ impl DnsClient {
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         socket.set_read_timeout(Some(Duration::from_secs(2)))?;
         socket.connect(server)?;
-        Ok(Self { socket, server: server.to_string() })
+        Ok(Self {
+            socket,
+            server: server.to_string(),
+        })
     }
 
     /// Sends a DNS query and returns the round-trip time.
@@ -120,20 +123,20 @@ fn fastrand_u16() -> u16 {
 // ============================================================================
 
 const DOMAINS: &[(&str, u16)] = &[
-    ("google.com", 1),        // A
-    ("cloudflare.com", 1),    // A
-    ("github.com", 1),        // A
-    ("youtube.com", 1),       // A
-    ("amazon.com", 1),        // A
-    ("reddit.com", 1),        // A
-    ("wikipedia.org", 1),     // A
-    ("apple.com", 1),         // A
-    ("microsoft.com", 1),     // A
-    ("netflix.com", 1),       // A
-    ("google.com", 28),       // AAAA
-    ("cloudflare.com", 28),   // AAAA
-    ("github.com", 15),       // MX
-    ("google.com", 16),       // TXT
+    ("google.com", 1),      // A
+    ("cloudflare.com", 1),  // A
+    ("github.com", 1),      // A
+    ("youtube.com", 1),     // A
+    ("amazon.com", 1),      // A
+    ("reddit.com", 1),      // A
+    ("wikipedia.org", 1),   // A
+    ("apple.com", 1),       // A
+    ("microsoft.com", 1),   // A
+    ("netflix.com", 1),     // A
+    ("google.com", 28),     // AAAA
+    ("cloudflare.com", 28), // AAAA
+    ("github.com", 15),     // MX
+    ("google.com", 16),     // TXT
 ];
 
 struct BenchResult {
@@ -180,7 +183,7 @@ fn run_bench(name: &str, addr: &str, queries: usize, warmup: usize) -> Option<Be
     let p50 = latencies[success * 50 / 100];
     let p95 = latencies[(success * 95 / 100).min(success - 1)];
     let p99 = latencies[(success * 99 / 100).min(success - 1)];
-    let qps  = success as f64 / elapsed.as_secs_f64();
+    let qps = success as f64 / elapsed.as_secs_f64();
 
     Some(BenchResult {
         name: name.to_string(),
@@ -251,13 +254,16 @@ fn env_usize(var: &str, default: usize) -> usize {
 #[ignore = "requires external DNS servers (see module docs)"]
 fn competitor_comparison() {
     let queries = env_usize("BENCH_QUERIES", 500);
-    let warmup  = env_usize("BENCH_WARMUP", 50);
+    let warmup = env_usize("BENCH_WARMUP", 50);
 
     let servers = [
-        ("Ferrous-DNS", env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353")),
-        ("Pi-hole",     env_addr("PIHOLE_ADDR",      "127.0.0.1:5354")),
-        ("AdGuard Home",env_addr("ADGUARD_ADDR",     "127.0.0.1:5355")),
-        ("Unbound",     env_addr("UNBOUND_ADDR",     "127.0.0.1:5356")),
+        (
+            "Ferrous-DNS",
+            env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353"),
+        ),
+        ("Pi-hole", env_addr("PIHOLE_ADDR", "127.0.0.1:5354")),
+        ("AdGuard Home", env_addr("ADGUARD_ADDR", "127.0.0.1:5355")),
+        ("Unbound", env_addr("UNBOUND_ADDR", "127.0.0.1:5356")),
     ];
 
     println!("\n=== Ferrous-DNS Competitor Comparison ===");
@@ -269,15 +275,24 @@ fn competitor_comparison() {
         .filter_map(|(name, addr)| {
             print!("  Benchmarking {name} ({addr})... ");
             match run_bench(name, addr, queries, warmup) {
-                Some(r) => { println!("done — {:.0} QPS", r.qps); Some(r) }
-                None    => { println!("UNREACHABLE (skipped)"); None }
+                Some(r) => {
+                    println!("done — {:.0} QPS", r.qps);
+                    Some(r)
+                }
+                None => {
+                    println!("UNREACHABLE (skipped)");
+                    None
+                }
             }
         })
         .collect();
 
     print_table(&results);
 
-    assert!(!results.is_empty(), "At least one DNS server must be reachable");
+    assert!(
+        !results.is_empty(),
+        "At least one DNS server must be reachable"
+    );
 }
 
 /// Benchmark only Ferrous-DNS — no competitors needed.
@@ -289,9 +304,9 @@ fn competitor_comparison() {
 #[test]
 #[ignore = "requires Ferrous-DNS to be running"]
 fn ferrous_only() {
-    let addr    = env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353");
+    let addr = env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353");
     let queries = env_usize("BENCH_QUERIES", 1000);
-    let warmup  = env_usize("BENCH_WARMUP", 100);
+    let warmup = env_usize("BENCH_WARMUP", 100);
 
     println!("\n=== Ferrous-DNS Latency Benchmark ===");
     println!("Target: {addr} | Queries: {queries} | Warm-up: {warmup}");
@@ -323,9 +338,9 @@ fn ferrous_only() {
 #[test]
 #[ignore = "requires Ferrous-DNS to be running"]
 fn cache_hit_latency() {
-    let addr    = env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353");
+    let addr = env_addr("FERROUS_DNS_ADDR", "127.0.0.1:5353");
     let queries = env_usize("BENCH_QUERIES", 1000);
-    let warmup  = env_usize("BENCH_WARMUP", 200);
+    let warmup = env_usize("BENCH_WARMUP", 200);
 
     println!("\n=== Ferrous-DNS Cache-Hit Latency ===");
     println!("Target: {addr} | Queries: {queries} | Warm-up: {warmup}");
@@ -362,7 +377,10 @@ fn cache_hit_latency() {
     // From CLAUDE.md: "Cache hit P99 < 35µs"
     // (this is wall-clock including UDP round-trip, so allow more headroom)
     if p99 > 1_000 {
-        println!("⚠  P99 {}µs exceeds 1ms — investigate cache performance", p99);
+        println!(
+            "⚠  P99 {}µs exceeds 1ms — investigate cache performance",
+            p99
+        );
     } else {
         println!("✓  P99 {}µs — within expected range", p99);
     }

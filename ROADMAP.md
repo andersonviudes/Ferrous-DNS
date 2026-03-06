@@ -72,7 +72,7 @@
 - [ ] Rate limiting DNS
 - [ ] DoS protection
 - [ ] DNS Tunneling
-- [ ] Entropy analysis (DGA detection)
+- [ ] Entropy analysis (DGA detection)2
 - [ ] Read-only / lockdown mode (disable config changes via flag)
 - [x] Separate listening ports for DoH and Admin UI
 
