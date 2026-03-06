@@ -1,0 +1,3 @@
+# AdGuard Home rewrites this file on startup (owned by root)
+# The initial config is committed; runtime changes are ignored
+AdGuardHome.yaml
