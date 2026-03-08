@@ -799,6 +799,8 @@ dependencies = [
  "ipnetwork",
  "libc",
  "lru",
+ "ring",
+ "sha2",
  "tokio",
  "tracing",
 ]
