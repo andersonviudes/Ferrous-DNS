@@ -144,6 +144,20 @@ record_type = "A"
 ttl = 300
 
 
+# ── Authentication ───────────────────────────────────────────────────────────
+
+[auth]
+enabled = true                          # Enable authentication for dashboard and API
+session_ttl_hours = 24                  # Session lifetime without "Remember Me" (hours)
+remember_me_days = 30                   # Session lifetime with "Remember Me" (days)
+login_rate_limit_attempts = 5           # Max failed login attempts before IP lockout
+login_rate_limit_window_secs = 900      # Lockout window in seconds (900 = 15 minutes)
+
+[auth.admin]
+username = "admin"                      # Admin username (TOML admin — always recoverable via file edit)
+# password_hash = ""                    # Argon2id hash — set via setup wizard or --reset-password CLI
+
+
 # ── Blocking ──────────────────────────────────────────────────────────────────
 
 [blocking]
