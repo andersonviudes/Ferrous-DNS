@@ -1,4 +1,6 @@
 pub mod api_key;
+pub mod api_tokens;
+pub mod auth;
 pub mod block_filter;
 pub mod blocked_services;
 pub mod blocklist;
@@ -44,3 +46,4 @@ pub use whitelist::get_whitelist;
 pub mod safe_search;
 pub mod schedule_profiles;
 pub mod upstream;
+pub mod users;

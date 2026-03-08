@@ -127,12 +127,14 @@ async fn async_main() -> anyhow::Result<()> {
 
     let app_state = wiring::build_app_state(
         use_cases,
+        &repos,
         &dns_services,
         config_arc,
         config_repo_pool,
         api_key,
         effective_config_path,
-    );
+    )
+    .await;
 
     let dns_addr = format!("{}:{}", config.server.bind_address, config.server.dns_port);
     let handler_use_case = dns_services.handler_use_case;
