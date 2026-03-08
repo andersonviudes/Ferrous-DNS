@@ -1,10 +1,10 @@
+use axum::routing::{delete, get, post};
 use axum::{
     extract::{Path, Request, State},
     http::{header, StatusCode},
     response::IntoResponse,
     Json, Router,
 };
-use axum::routing::{delete, get, post};
 use tracing::debug;
 
 use crate::dto::auth::{
@@ -28,7 +28,7 @@ pub fn protected_routes() -> Router<AppState> {
 pub async fn get_auth_status_public(
     State(state): State<AppState>,
 ) -> Result<Json<AuthStatusResponse>, ApiError> {
-    let status = state.auth.get_auth_status.execute();
+    let status = state.auth.get_auth_status.execute().await;
     debug!(
         enabled = status.auth_enabled,
         setup_required = !status.password_configured,

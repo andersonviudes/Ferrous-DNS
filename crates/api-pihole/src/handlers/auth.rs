@@ -13,19 +13,18 @@ use crate::{
 /// Pi-hole v6 GET /api/auth — returns current session state.
 pub async fn get_session() -> Json<AuthResponse> {
     Json(AuthResponse {
-        session: unauthenticated_session("Use POST /api/auth with your API key"),
+        session: unauthenticated_session("Use POST /api/auth with your password"),
     })
 }
 
 /// Pi-hole v6 POST /api/auth — validates credentials and returns a session.
 ///
-/// When `LoginUseCase` is wired, creates a real Ferrous DNS session.
-/// Falls back to legacy static API key comparison when not available.
+/// Uses `LoginUseCase` to create a real Ferrous DNS session.
+/// If no `LoginUseCase` is wired, allows unauthenticated access.
 pub async fn login(
     State(state): State<PiholeAppState>,
     Json(body): Json<LoginRequest>,
 ) -> Response {
-    // Try real session auth first (via LoginUseCase)
     if let (Some(ref login_uc), Some(ref admin_user)) = (&state.login, &state.admin_username) {
         match login_uc
             .execute(
@@ -54,42 +53,33 @@ pub async fn login(
                     .into_response();
             }
             Err(_) => {
-                // Fall through to legacy API key check
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(AuthResponse {
+                        session: unauthenticated_session("Incorrect password"),
+                    }),
+                )
+                    .into_response();
             }
         }
     }
 
-    // Legacy: static API key comparison
-    let authenticated = match &state.api_key {
-        Some(key) => constant_time_eq(key.as_ref().as_bytes(), body.password.as_bytes()),
-        None => true,
-    };
-
-    if authenticated {
-        let sid = generate_session_id();
-        (
-            StatusCode::OK,
-            Json(AuthResponse {
-                session: SessionInfo {
-                    valid: true,
-                    totp: false,
-                    sid,
-                    csrf: String::new(),
-                    validity: 1_800,
-                    message: String::new(),
-                },
-            }),
-        )
-            .into_response()
-    } else {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(AuthResponse {
-                session: unauthenticated_session("Incorrect password"),
-            }),
-        )
-            .into_response()
-    }
+    // No LoginUseCase wired — allow unauthenticated access
+    let sid = generate_session_id();
+    (
+        StatusCode::OK,
+        Json(AuthResponse {
+            session: SessionInfo {
+                valid: true,
+                totp: false,
+                sid,
+                csrf: String::new(),
+                validity: 1_800,
+                message: String::new(),
+            },
+        }),
+    )
+        .into_response()
 }
 
 /// Pi-hole v6 DELETE /api/auth — session logout.
@@ -98,22 +88,19 @@ pub async fn logout() -> StatusCode {
 }
 
 fn generate_session_id() -> String {
+    use ring::rand::SecureRandom;
     use std::fmt::Write;
+
     let mut buf = [0u8; 16];
     ring::rand::SystemRandom::new()
         .fill(&mut buf)
-        .unwrap_or_else(|_| {
-            // Fallback: zero-filled is still unique enough for legacy compat
-            buf = [0u8; 16];
-        });
+        .expect("OS CSPRNG unavailable");
     let mut hex = String::with_capacity(32);
     for byte in &buf {
         let _ = write!(hex, "{byte:02x}");
     }
     hex
 }
-
-use ring::rand::SecureRandom;
 
 fn unauthenticated_session(message: &str) -> SessionInfo {
     SessionInfo {
@@ -124,15 +111,4 @@ fn unauthenticated_session(message: &str) -> SessionInfo {
         validity: 0,
         message: message.to_string(),
     }
-}
-
-/// Constant-time byte comparison to prevent timing side-channels on API key.
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    let mut diff = (a.len() ^ b.len()) as u8;
-    for i in 0..a.len().max(b.len()) {
-        let x = if i < a.len() { a[i] } else { 0 };
-        let y = if i < b.len() { b[i] } else { 0 };
-        diff |= x ^ y;
-    }
-    diff == 0
 }

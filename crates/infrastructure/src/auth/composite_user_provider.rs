@@ -14,10 +14,13 @@ use super::toml_admin_provider::TomlAdminProvider;
 /// Follows the same Composite pattern as `CompositeServiceCatalog`:
 /// a static source (TOML admin) merged with a dynamic source (SQLite users).
 /// TOML admin always takes priority when usernames collide.
+///
+/// Shares the same `Arc<RwLock<Config>>` as the rest of the application
+/// so that password changes are immediately visible to `GetAuthStatusUseCase`.
 pub struct CompositeUserProvider {
     toml_admin: RwLock<TomlAdminProvider>,
     db_users: Arc<dyn UserRepository>,
-    config: RwLock<Config>,
+    config: Arc<RwLock<Config>>,
     config_path: Option<String>,
     config_persistence: Arc<dyn ConfigFilePersistence>,
 }
@@ -26,14 +29,14 @@ impl CompositeUserProvider {
     pub fn new(
         toml_admin: TomlAdminProvider,
         db_users: Arc<dyn UserRepository>,
-        config: Config,
+        config: Arc<RwLock<Config>>,
         config_path: Option<String>,
         config_persistence: Arc<dyn ConfigFilePersistence>,
     ) -> Self {
         Self {
             toml_admin: RwLock::new(toml_admin),
             db_users,
-            config: RwLock::new(config),
+            config,
             config_path,
             config_persistence,
         }

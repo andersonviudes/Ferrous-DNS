@@ -1,11 +1,13 @@
 mod create_api_token;
 mod delete_api_token;
 mod get_api_tokens;
+mod update_api_token;
 mod validate_api_token;
 
 pub use create_api_token::{CreateApiTokenUseCase, CreatedApiToken};
 pub use delete_api_token::DeleteApiTokenUseCase;
 pub use get_api_tokens::GetApiTokensUseCase;
+pub use update_api_token::UpdateApiTokenUseCase;
 pub use validate_api_token::ValidateApiTokenUseCase;
 
 use ferrous_dns_domain::DomainError;

@@ -48,9 +48,7 @@ impl IntoResponse for ApiError {
 
             DomainError::DuplicateApiTokenName(_)
             | DomainError::DuplicateUsername(_)
-            | DomainError::PasswordAlreadyConfigured => {
-                (StatusCode::CONFLICT, self.0.to_string())
-            }
+            | DomainError::PasswordAlreadyConfigured => (StatusCode::CONFLICT, self.0.to_string()),
 
             DomainError::InvalidUsername(_)
             | DomainError::InvalidPassword(_)

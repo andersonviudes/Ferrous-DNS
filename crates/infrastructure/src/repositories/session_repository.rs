@@ -146,7 +146,10 @@ fn row_to_session(
     ),
 ) -> AuthSession {
     let role = UserRole::parse(&row.2).unwrap_or_else(|_| {
-        tracing::error!(role = row.2, "Invalid session role in database, defaulting to Viewer");
+        tracing::error!(
+            role = row.2,
+            "Invalid session role in database, defaulting to Viewer"
+        );
         UserRole::Viewer
     });
     AuthSession {

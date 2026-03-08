@@ -23,7 +23,7 @@ pub mod whitelist_sources;
 
 pub use api_tokens::{
     CreateApiTokenUseCase, CreatedApiToken, DeleteApiTokenUseCase, GetApiTokensUseCase,
-    ValidateApiTokenUseCase,
+    UpdateApiTokenUseCase, ValidateApiTokenUseCase,
 };
 pub use auth::{
     AuthStatus, ChangePasswordUseCase, GetActiveSessionsUseCase, GetAuthStatusUseCase,

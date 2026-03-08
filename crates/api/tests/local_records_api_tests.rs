@@ -620,7 +620,6 @@ async fn create_test_app() -> (Router, Arc<RwLock<Config>>) {
         auth: helpers::build_test_auth_use_cases(),
         config: config.clone(),
         config_file_persistence: Arc::new(ferrous_dns_infrastructure::repositories::TomlConfigFilePersistence),
-        api_key: None,
         config_path: None,
     };
 

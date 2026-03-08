@@ -1,4 +1,3 @@
-pub mod api_key;
 pub mod api_tokens;
 pub mod auth;
 pub mod block_filter;
@@ -27,7 +26,6 @@ pub mod timeline;
 pub mod whitelist;
 pub mod whitelist_sources;
 
-pub use api_key::generate_api_key;
 pub use blocklist::get_blocklist;
 pub use cache::{get_cache_metrics, get_cache_stats};
 pub use client_groups::assign_client_to_group;

@@ -47,12 +47,6 @@
                 mem_total_kb: 0, mem_used_kb: 0, mem_available_kb: 0, mem_used_percent: 0,
             },
             restartRequired: false,
-            apiRestartRequired: false,
-            newApiKey: '',
-            showApiKey: false,
-            apiKeyJustGenerated: false,
-            dashboardSessionKey: localStorage.getItem('ferrous_api_key') || '',
-            dashboardAuthenticated: !!localStorage.getItem('ferrous_api_key'),
             alert: {show: false, type: 'success', message: ''},
             // Security tab state
             authConfig: {enabled: false, session_ttl_hours: 24, remember_me_days: 30, login_rate_limit_attempts: 5, login_rate_limit_window_secs: 300},
@@ -63,7 +57,11 @@
             apiTokens: [],
             showCreateToken: false,
             newTokenName: '',
+            newTokenCustomKey: '',
             generatedToken: '',
+            editingToken: null,
+            editTokenName: '',
+            editTokenCustomKey: '',
             activeSessions: [],
             async init() {
                 this.theme = localStorage.getItem('theme') || 'light';
@@ -121,7 +119,6 @@
                                 dns_port: data.server?.dns_port ?? 53,
                                 web_port: data.server?.web_port ?? 8080,
                                 bind_address: data.server?.bind_address ?? '0.0.0.0',
-                                api_key_enabled: data.server?.api_key_enabled ?? false,
                                 pihole_compat: data.server?.pihole_compat ?? false,
                             },
                             dns: {
@@ -153,6 +150,15 @@
                                 priority: 1,
                                 servers: [...data.dns.upstream_servers]
                             }]
+                        }
+                        if (data.auth) {
+                            this.authConfig = {
+                                enabled: data.auth.enabled,
+                                session_ttl_hours: data.auth.session_ttl_hours,
+                                remember_me_days: data.auth.remember_me_days,
+                                login_rate_limit_attempts: data.auth.login_rate_limit_attempts,
+                                login_rate_limit_window_secs: data.auth.login_rate_limit_window_secs
+                            };
                         }
                     } else {
                         this.showAlert('error', 'Failed to load configuration')
@@ -249,89 +255,12 @@
                     this.showAlert('error', 'Error: ' + e.message)
                 }
             },
-            saveDashboardSessionKey() {
-                const key = this.dashboardSessionKey.trim();
-                if (key) {
-                    localStorage.setItem('ferrous_api_key', key);
-                    this.dashboardAuthenticated = true;
-                    this.showAlert('success', 'Dashboard authenticated successfully');
-                } else {
-                    localStorage.removeItem('ferrous_api_key');
-                    this.dashboardAuthenticated = false;
-                    this.showAlert('success', 'Dashboard session key cleared');
-                }
-            },
             toggleLocalDomain() {
                 if (this.settings.local_domain) {
                     this.settings.local_domain = '';
                     this.settings.local_dns_server = '';
                 } else {
                     this.settings.local_domain = 'lan';
-                }
-            },
-            async generateApiKey() {
-                try {
-                    const r = await apiFetch(`${API_BASE}/api-key/generate`, {method: 'POST'});
-                    if (r.ok) {
-                        const data = await r.json();
-                        this.newApiKey = data.key;
-                        this.showApiKey = true;
-                        this.apiKeyJustGenerated = true;
-                        scheduleLucide(50);
-                    } else {
-                        this.showAlert('error', 'Failed to generate key')
-                    }
-                } catch (e) {
-                    this.showAlert('error', 'Error: ' + e.message)
-                }
-            },
-            async saveApiKey() {
-                if (!this.newApiKey.trim()) return;
-                try {
-                    const r = await apiFetch(`${API_BASE}/config`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({server: {api_key: this.newApiKey.trim()}})
-                    });
-                    const data = await r.json();
-                    if (r.ok && data.success !== false) {
-                        this.config.server.api_key_enabled = true;
-                        this.apiRestartRequired = true;
-                        this.apiKeyJustGenerated = false;
-                        localStorage.setItem('ferrous_api_key', this.newApiKey.trim());
-                        this.dashboardSessionKey = this.newApiKey.trim();
-                        this.dashboardAuthenticated = true;
-                        this.showAlert('success', 'API key saved. Restart the server to activate.');
-                        scheduleLucide(50);
-                    } else {
-                        this.showAlert('error', 'Failed: ' + (data.error || data.message || 'Unknown error'))
-                    }
-                } catch (e) {
-                    this.showAlert('error', 'Error: ' + e.message)
-                }
-            },
-            async removeApiKey() {
-                try {
-                    const r = await apiFetch(`${API_BASE}/config`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({server: {clear_api_key: true}})
-                    });
-                    const data = await r.json();
-                    if (r.ok && data.success !== false) {
-                        this.config.server.api_key_enabled = false;
-                        this.newApiKey = '';
-                        this.apiRestartRequired = true;
-                        localStorage.removeItem('ferrous_api_key');
-                        this.dashboardSessionKey = '';
-                        this.dashboardAuthenticated = false;
-                        this.showAlert('success', 'API key removed. Restart the server to apply.');
-                        scheduleLucide(50);
-                    } else {
-                        this.showAlert('error', 'Failed: ' + (data.error || data.message || 'Unknown error'))
-                    }
-                } catch (e) {
-                    this.showAlert('error', 'Error: ' + e.message)
                 }
             },
             async savePiholeCompat() {
@@ -427,13 +356,7 @@
             },
             // --- Security tab methods ---
             async loadAuthConfig() {
-                try {
-                    const r = await apiFetch(`${API_BASE}/auth/status`);
-                    if (r.ok) {
-                        const data = await r.json();
-                        this.authConfig.enabled = data.enabled;
-                    }
-                } catch (e) { console.error('Load auth config:', e); }
+                // Auth config is now populated by loadConfig() to avoid duplicate fetch
             },
             async saveAuthConfig() {
                 try {
@@ -525,21 +448,62 @@
             async createApiToken() {
                 if (!this.newTokenName.trim()) return;
                 try {
+                    const payload = {name: this.newTokenName.trim()};
+                    if (this.newTokenCustomKey.trim()) {
+                        payload.token = this.newTokenCustomKey.trim();
+                    }
                     const r = await apiFetch(`${API_BASE}/api-tokens`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({name: this.newTokenName.trim()})
+                        body: JSON.stringify(payload)
                     });
                     if (r.ok || r.status === 201) {
                         const data = await r.json();
                         this.generatedToken = data.token;
                         this.showCreateToken = false;
                         this.newTokenName = '';
+                        this.newTokenCustomKey = '';
                         await this.loadApiTokens();
                         scheduleLucide(50);
                     } else {
                         const data = await r.json().catch(() => ({}));
                         this.showAlert('error', data.error || 'Failed to create token');
+                    }
+                } catch (e) { this.showAlert('error', 'Error: ' + e.message); }
+            },
+            startEditToken(token) {
+                this.editingToken = token.id;
+                this.editTokenName = token.name;
+                this.editTokenCustomKey = '';
+                scheduleLucide(50);
+            },
+            cancelEditToken() {
+                this.editingToken = null;
+                this.editTokenName = '';
+                this.editTokenCustomKey = '';
+            },
+            async saveApiTokenEdit(id) {
+                if (!this.editTokenName.trim()) return;
+                try {
+                    const payload = {name: this.editTokenName.trim()};
+                    if (this.editTokenCustomKey.trim()) {
+                        payload.token = this.editTokenCustomKey.trim();
+                    }
+                    const r = await apiFetch(`${API_BASE}/api-tokens/${id}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    if (r.ok) {
+                        this.editingToken = null;
+                        this.editTokenName = '';
+                        this.editTokenCustomKey = '';
+                        await this.loadApiTokens();
+                        this.showAlert('success', 'Token updated');
+                        scheduleLucide(50);
+                    } else {
+                        const data = await r.json().catch(() => ({}));
+                        this.showAlert('error', data.error || 'Failed to update token');
                     }
                 } catch (e) { this.showAlert('error', 'Error: ' + e.message); }
             },

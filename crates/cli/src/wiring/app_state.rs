@@ -7,7 +7,7 @@ use ferrous_dns_application::use_cases::{
     ChangePasswordUseCase, CreateApiTokenUseCase, CreateLocalRecordUseCase, CreateUserUseCase,
     DeleteApiTokenUseCase, DeleteLocalRecordUseCase, DeleteUserUseCase, GetActiveSessionsUseCase,
     GetApiTokensUseCase, GetAuthStatusUseCase, GetUsersUseCase, LoginUseCase, LogoutUseCase,
-    SetupPasswordUseCase, UpdateLocalRecordUseCase, ValidateApiTokenUseCase,
+    SetupPasswordUseCase, UpdateApiTokenUseCase, UpdateLocalRecordUseCase, ValidateApiTokenUseCase,
     ValidateSessionUseCase,
 };
 use ferrous_dns_domain::Config;
@@ -28,7 +28,6 @@ pub async fn build_app_state(
     dns_services: &DnsServices,
     config: Arc<RwLock<Config>>,
     config_repo_pool: SqlitePool,
-    api_key: Option<Arc<str>>,
     config_path: Option<Arc<str>>,
 ) -> AppState {
     let config_repo: Arc<dyn ferrous_dns_application::ports::ConfigRepository> =
@@ -47,7 +46,7 @@ pub async fn build_app_state(
     let user_provider: Arc<dyn UserProvider> = Arc::new(CompositeUserProvider::new(
         toml_admin,
         repos.user.clone(),
-        config.read().await.clone(),
+        config.clone(),
         config_path
             .as_deref()
             .map(String::from)
@@ -73,10 +72,11 @@ pub async fn build_app_state(
             user_provider.clone(),
             password_hasher.clone(),
         )),
-        get_auth_status: Arc::new(GetAuthStatusUseCase::new(auth_config)),
+        get_auth_status: Arc::new(GetAuthStatusUseCase::new(config.clone())),
         get_active_sessions: Arc::new(GetActiveSessionsUseCase::new(repos.session.clone())),
         create_api_token: Arc::new(CreateApiTokenUseCase::new(repos.api_token.clone())),
         get_api_tokens: Arc::new(GetApiTokensUseCase::new(repos.api_token.clone())),
+        update_api_token: Arc::new(UpdateApiTokenUseCase::new(repos.api_token.clone())),
         delete_api_token: Arc::new(DeleteApiTokenUseCase::new(repos.api_token.clone())),
         validate_api_token: Arc::new(ValidateApiTokenUseCase::new(repos.api_token.clone())),
         create_user: Arc::new(CreateUserUseCase::new(
@@ -182,7 +182,6 @@ pub async fn build_app_state(
         auth,
         config,
         config_file_persistence: config_persistence,
-        api_key,
         config_path,
     }
 }

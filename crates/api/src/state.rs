@@ -19,10 +19,10 @@ use ferrous_dns_application::use_cases::{
     GetTimelineUseCase, GetTopBlockedDomainsUseCase, GetTopClientsUseCase, GetUsersUseCase,
     GetWhitelistSourcesUseCase, GetWhitelistUseCase, LoginUseCase, LogoutUseCase,
     ManageTimeSlotsUseCase, SetupPasswordUseCase, ToggleSafeSearchUseCase, UnblockServiceUseCase,
-    UpdateBlocklistSourceUseCase, UpdateClientUseCase, UpdateCustomServiceUseCase,
-    UpdateGroupUseCase, UpdateLocalRecordUseCase, UpdateManagedDomainUseCase,
-    UpdateRegexFilterUseCase, UpdateScheduleProfileUseCase, UpdateWhitelistSourceUseCase,
-    ValidateApiTokenUseCase, ValidateSessionUseCase,
+    UpdateApiTokenUseCase, UpdateBlocklistSourceUseCase, UpdateClientUseCase,
+    UpdateCustomServiceUseCase, UpdateGroupUseCase, UpdateLocalRecordUseCase,
+    UpdateManagedDomainUseCase, UpdateRegexFilterUseCase, UpdateScheduleProfileUseCase,
+    UpdateWhitelistSourceUseCase, ValidateApiTokenUseCase, ValidateSessionUseCase,
 };
 use ferrous_dns_domain::Config;
 use std::sync::Arc;
@@ -132,6 +132,7 @@ pub struct AuthUseCases {
     pub get_active_sessions: Arc<GetActiveSessionsUseCase>,
     pub create_api_token: Arc<CreateApiTokenUseCase>,
     pub get_api_tokens: Arc<GetApiTokensUseCase>,
+    pub update_api_token: Arc<UpdateApiTokenUseCase>,
     pub delete_api_token: Arc<DeleteApiTokenUseCase>,
     pub validate_api_token: Arc<ValidateApiTokenUseCase>,
     pub create_user: Arc<CreateUserUseCase>,
@@ -152,7 +153,6 @@ pub struct AppState {
     pub auth: AuthUseCases,
     pub config: Arc<RwLock<Config>>,
     pub config_file_persistence: Arc<dyn ConfigFilePersistence>,
-    pub api_key: Option<Arc<str>>,
     pub config_path: Option<Arc<str>>,
 }
 
@@ -166,7 +166,7 @@ impl AppState {
     }
 
     /// Returns whether authentication is globally enabled.
-    pub fn auth_enabled(&self) -> bool {
-        self.auth.get_auth_status.execute().auth_enabled
+    pub async fn auth_enabled(&self) -> bool {
+        self.auth.get_auth_status.execute().await.auth_enabled
     }
 }

@@ -156,7 +156,10 @@ impl UserRepository for SqliteUserRepository {
 
 fn row_to_user(row: UserRow) -> User {
     let role = UserRole::parse(&row.4).unwrap_or_else(|_| {
-        tracing::error!(role = row.4, "Invalid user role in database, defaulting to Viewer");
+        tracing::error!(
+            role = row.4,
+            "Invalid user role in database, defaulting to Viewer"
+        );
         UserRole::Viewer
     });
     User {

@@ -1,22 +1,27 @@
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::instrument;
 
-use ferrous_dns_domain::AuthConfig;
+use ferrous_dns_domain::Config;
 
 /// Returns authentication status info (no auth required to call).
+///
+/// Reads from the live `Config` so changes (e.g. password setup) are
+/// visible immediately without server restart.
 pub struct GetAuthStatusUseCase {
-    auth_config: Arc<AuthConfig>,
+    config: Arc<RwLock<Config>>,
 }
 
 impl GetAuthStatusUseCase {
-    pub fn new(auth_config: Arc<AuthConfig>) -> Self {
-        Self { auth_config }
+    pub fn new(config: Arc<RwLock<Config>>) -> Self {
+        Self { config }
     }
 
     #[instrument(skip(self))]
-    pub fn execute(&self) -> AuthStatus {
-        let password_configured = self
-            .auth_config
+    pub async fn execute(&self) -> AuthStatus {
+        let config = self.config.read().await;
+        let password_configured = config
+            .auth
             .admin
             .password_hash
             .as_ref()
@@ -24,7 +29,7 @@ impl GetAuthStatusUseCase {
             .unwrap_or(false);
 
         AuthStatus {
-            auth_enabled: self.auth_config.enabled,
+            auth_enabled: config.auth.enabled,
             password_configured,
         }
     }

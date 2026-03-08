@@ -12,14 +12,14 @@ use axum::{
 /// Authentication flow:
 /// 1. If auth is disabled in config, allow all requests through.
 /// 2. Check for session cookie (`ferrous_session`) → validate via `ValidateSessionUseCase`.
-/// 3. Check for `X-Api-Key` header → validate via `ValidateApiTokenUseCase` or legacy static key.
+/// 3. Check for `X-Api-Key` header → validate via `ValidateApiTokenUseCase`.
 /// 4. If neither is valid, return 401 Unauthorized.
 pub async fn require_auth(
     State(state): State<AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if !state.auth_enabled() {
+    if !state.auth_enabled().await {
         return Ok(next.run(request).await);
     }
 
@@ -38,12 +38,6 @@ pub async fn require_auth(
     if let Some(token) = extract_api_token(&request) {
         if state.auth.validate_api_token.execute(&token).await.is_ok() {
             return Ok(next.run(request).await);
-        }
-
-        if let Some(ref expected) = state.api_key {
-            if crate::middleware::timing_safe_eq(token.as_bytes(), expected.as_bytes()) {
-                return Ok(next.run(request).await);
-            }
         }
     }
 

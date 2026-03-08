@@ -1,11 +1,13 @@
-use ferrous_dns_api::middleware::timing_safe_eq;
 use ferrous_dns_application::ports::{PasswordHasher, SessionRepository, UserProvider};
 use ferrous_dns_application::use_cases::{
     GetAuthStatusUseCase, LoginUseCase, ValidateSessionUseCase,
 };
 use ferrous_dns_domain::config::auth::AdminConfig;
-use ferrous_dns_domain::{AuthConfig, AuthSession, DomainError, User, UserRole, UserSource};
+use ferrous_dns_domain::{
+    AuthConfig, AuthSession, Config, DomainError, User, UserRole, UserSource,
+};
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 // --- In-memory test implementations ---
 
@@ -99,26 +101,102 @@ fn make_admin_user(password_hash: &str) -> User {
 /// GetAuthStatusUseCase returns correct enabled/configured state.
 #[tokio::test]
 async fn auth_status_reflects_config() {
-    let config_enabled = Arc::new(AuthConfig {
-        enabled: true,
-        admin: AdminConfig {
-            username: "admin".to_string(),
-            password_hash: Some("$argon2id$test".to_string()),
+    let config_enabled = Arc::new(RwLock::new(Config {
+        auth: AuthConfig {
+            enabled: true,
+            admin: AdminConfig {
+                username: "admin".to_string(),
+                password_hash: Some("$argon2id$test".to_string()),
+            },
+            ..AuthConfig::default()
         },
-        ..AuthConfig::default()
-    });
+        ..Config::default()
+    }));
     let uc = GetAuthStatusUseCase::new(config_enabled);
-    let status = uc.execute();
+    let status = uc.execute().await;
     assert!(status.auth_enabled);
     assert!(status.password_configured);
 
-    let config_disabled = Arc::new(AuthConfig {
-        enabled: false,
-        ..AuthConfig::default()
-    });
+    let config_disabled = Arc::new(RwLock::new(Config {
+        auth: AuthConfig {
+            enabled: false,
+            ..AuthConfig::default()
+        },
+        ..Config::default()
+    }));
     let uc2 = GetAuthStatusUseCase::new(config_disabled);
-    let status2 = uc2.execute();
+    let status2 = uc2.execute().await;
     assert!(!status2.auth_enabled);
+}
+
+/// Empty password hash is treated as not configured.
+#[tokio::test]
+async fn auth_status_empty_hash_means_not_configured() {
+    let config = Arc::new(RwLock::new(Config {
+        auth: AuthConfig {
+            enabled: true,
+            admin: AdminConfig {
+                username: "admin".to_string(),
+                password_hash: Some(String::new()),
+            },
+            ..AuthConfig::default()
+        },
+        ..Config::default()
+    }));
+    let uc = GetAuthStatusUseCase::new(config);
+    let status = uc.execute().await;
+    assert!(status.auth_enabled);
+    assert!(!status.password_configured, "empty hash = not configured");
+}
+
+/// None password hash is treated as not configured.
+#[tokio::test]
+async fn auth_status_none_hash_means_not_configured() {
+    let config = Arc::new(RwLock::new(Config {
+        auth: AuthConfig {
+            enabled: true,
+            admin: AdminConfig {
+                username: "admin".to_string(),
+                password_hash: None,
+            },
+            ..AuthConfig::default()
+        },
+        ..Config::default()
+    }));
+    let uc = GetAuthStatusUseCase::new(config);
+    let status = uc.execute().await;
+    assert!(!status.password_configured, "None hash = not configured");
+}
+
+/// Config changes via RwLock are visible immediately.
+#[tokio::test]
+async fn auth_status_reflects_live_config_changes() {
+    let config = Arc::new(RwLock::new(Config {
+        auth: AuthConfig {
+            enabled: true,
+            admin: AdminConfig {
+                username: "admin".to_string(),
+                password_hash: None,
+            },
+            ..AuthConfig::default()
+        },
+        ..Config::default()
+    }));
+    let uc = GetAuthStatusUseCase::new(config.clone());
+
+    let before = uc.execute().await;
+    assert!(!before.password_configured);
+
+    {
+        let mut cfg = config.write().await;
+        cfg.auth.admin.password_hash = Some("$argon2id$newhash".to_string());
+    }
+
+    let after = uc.execute().await;
+    assert!(
+        after.password_configured,
+        "should see updated hash immediately"
+    );
 }
 
 /// Login with correct credentials creates a session.
@@ -257,11 +335,13 @@ async fn validate_session_fails_for_unknown_id() {
     assert!(result.is_err());
 }
 
-/// Constant-time comparison works correctly.
+/// Constant-time comparison works correctly (uses subtle crate directly).
 #[test]
 fn timing_safe_eq_basic_correctness() {
-    assert!(timing_safe_eq(b"token123", b"token123"));
-    assert!(!timing_safe_eq(b"token123", b"token456"));
-    assert!(!timing_safe_eq(b"short", b"longer-value"));
-    assert!(timing_safe_eq(b"", b""));
+    use subtle::ConstantTimeEq;
+    let eq = |a: &[u8], b: &[u8]| -> bool { a.ct_eq(b).into() };
+    assert!(eq(b"token123", b"token123"));
+    assert!(!eq(b"token123", b"token456"));
+    assert!(!eq(b"short", b"longer-value"));
+    assert!(eq(b"", b""));
 }

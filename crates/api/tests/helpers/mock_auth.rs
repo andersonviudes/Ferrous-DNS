@@ -5,10 +5,10 @@ use ferrous_dns_application::ports::{
 use ferrous_dns_application::use_cases::{
     ChangePasswordUseCase, CreateApiTokenUseCase, CreateUserUseCase, DeleteApiTokenUseCase,
     DeleteUserUseCase, GetActiveSessionsUseCase, GetApiTokensUseCase, GetAuthStatusUseCase,
-    GetUsersUseCase, LoginUseCase, LogoutUseCase, SetupPasswordUseCase, ValidateApiTokenUseCase,
-    ValidateSessionUseCase,
+    GetUsersUseCase, LoginUseCase, LogoutUseCase, SetupPasswordUseCase, UpdateApiTokenUseCase,
+    ValidateApiTokenUseCase, ValidateSessionUseCase,
 };
-use ferrous_dns_domain::{ApiToken, AuthConfig, AuthSession, DomainError, User};
+use ferrous_dns_domain::{ApiToken, AuthConfig, AuthSession, Config, DomainError, User};
 use std::sync::Arc;
 
 pub struct NullSessionRepository;
@@ -104,6 +104,7 @@ impl ApiTokenRepository for NullApiTokenRepository {
         _name: &str,
         _key_prefix: &str,
         _key_hash: &str,
+        _key_raw: &str,
     ) -> Result<ApiToken, DomainError> {
         Err(DomainError::ConfigError("not implemented".to_string()))
     }
@@ -116,6 +117,16 @@ impl ApiTokenRepository for NullApiTokenRepository {
     async fn get_by_name(&self, _name: &str) -> Result<Option<ApiToken>, DomainError> {
         Ok(None)
     }
+    async fn update(
+        &self,
+        _id: i64,
+        _name: &str,
+        _key_prefix: Option<&str>,
+        _key_hash: Option<&str>,
+        _key_raw: Option<&str>,
+    ) -> Result<ApiToken, DomainError> {
+        Err(DomainError::ConfigError("not implemented".to_string()))
+    }
     async fn delete(&self, _id: i64) -> Result<(), DomainError> {
         Ok(())
     }
@@ -124,6 +135,9 @@ impl ApiTokenRepository for NullApiTokenRepository {
     }
     async fn get_all_hashes(&self) -> Result<Vec<(i64, String)>, DomainError> {
         Ok(vec![])
+    }
+    async fn get_id_by_hash(&self, _key_hash: &str) -> Result<Option<i64>, DomainError> {
+        Ok(None)
     }
 }
 
@@ -137,6 +151,10 @@ pub fn build_test_auth_use_cases() -> AuthUseCases {
         enabled: false,
         ..AuthConfig::default()
     });
+    let config = Arc::new(tokio::sync::RwLock::new(Config {
+        auth: (*auth_config).clone(),
+        ..Config::default()
+    }));
 
     AuthUseCases {
         login: Arc::new(LoginUseCase::new(
@@ -156,10 +174,11 @@ pub fn build_test_auth_use_cases() -> AuthUseCases {
             user_provider.clone(),
             password_hasher.clone(),
         )),
-        get_auth_status: Arc::new(GetAuthStatusUseCase::new(auth_config)),
+        get_auth_status: Arc::new(GetAuthStatusUseCase::new(config)),
         get_active_sessions: Arc::new(GetActiveSessionsUseCase::new(session_repo)),
         create_api_token: Arc::new(CreateApiTokenUseCase::new(api_token_repo.clone())),
         get_api_tokens: Arc::new(GetApiTokensUseCase::new(api_token_repo.clone())),
+        update_api_token: Arc::new(UpdateApiTokenUseCase::new(api_token_repo.clone())),
         delete_api_token: Arc::new(DeleteApiTokenUseCase::new(api_token_repo.clone())),
         validate_api_token: Arc::new(ValidateApiTokenUseCase::new(api_token_repo)),
         create_user: Arc::new(CreateUserUseCase::new(

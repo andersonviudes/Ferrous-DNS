@@ -112,6 +112,21 @@ async function logout() {
     window.location.href = '/login.html';
 }
 
+// --- User-agent parser ---
+
+function parseBrowser(ua) {
+    if (!ua || ua === 'unknown') return 'Unknown';
+    if (ua.includes('Edg/')) return 'Edge';
+    if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+    if (ua.includes('Vivaldi/')) return 'Vivaldi';
+    if (ua.includes('Brave')) return 'Brave';
+    if (ua.includes('Chrome/') && ua.includes('Safari/')) return 'Chrome';
+    if (ua.includes('Firefox/')) return 'Firefox';
+    if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+    if (ua.includes('curl/')) return 'curl';
+    return ua.length > 30 ? ua.substring(0, 30) + '...' : ua;
+}
+
 // --- Rate color using CSS custom properties ---
 
 function getRateColor(queryRate) {

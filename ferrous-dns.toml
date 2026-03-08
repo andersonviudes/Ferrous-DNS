@@ -9,8 +9,6 @@
 dns_port = 53                           # UDP/TCP port for DNS queries
 web_port = 8080                         # HTTP port for the web dashboard and REST API
 bind_address = "0.0.0.0"                # Address to bind on; 0.0.0.0 listens on all interfaces
-# cors_allowed_origins = ["*"]          # Allowed CORS origins for the REST API
-api_key = "your-secret-key"           # API key for authenticated endpoints (omit to disable)
 
 # Enables the Pi-hole v6 compatible API at /api/* so third-party dashboards,
 # plugins, and automations that expect the Pi-hole API continue to work.
@@ -155,7 +153,7 @@ login_rate_limit_window_secs = 900      # Lockout window in seconds (900 = 15 mi
 
 [auth.admin]
 username = "admin"                      # Admin username (TOML admin — always recoverable via file edit)
-# password_hash = ""                    # Argon2id hash — set via setup wizard or --reset-password CLI
+password_hash = "$argon2id$v=19$m=19456,t=2,p=1$9pNep2fexSNQtaie80I/Mg$T9qgw7GKOCSUUZdfUNaMLVV13yftftRGoeFmFGFKa8I"                      # Argon2id hash — set via setup wizard or --reset-password CLI
 
 
 # ── Blocking ──────────────────────────────────────────────────────────────────

@@ -16,13 +16,7 @@ impl DeleteApiTokenUseCase {
 
     #[instrument(skip(self))]
     pub async fn execute(&self, id: i64) -> Result<(), DomainError> {
-        self.repo
-            .get_by_id(id)
-            .await?
-            .ok_or(DomainError::ApiTokenNotFound(id))?;
-
         self.repo.delete(id).await?;
-
         info!(id = id, "API token revoked");
         Ok(())
     }

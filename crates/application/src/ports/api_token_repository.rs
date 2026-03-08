@@ -3,16 +3,17 @@ use ferrous_dns_domain::{ApiToken, DomainError};
 
 /// Port for managing named API tokens in persistent storage.
 ///
-/// Tokens are stored as SHA-256 hashes — the raw token is returned only
-/// once at creation time and never persisted.
+/// Tokens are validated via SHA-256 hashes. The raw token is also persisted
+/// for admin display but never exposed in listing endpoints.
 #[async_trait]
 pub trait ApiTokenRepository: Send + Sync {
-    /// Store a new token (name + hash + prefix). Returns the persisted entity.
+    /// Store a new token (name + hash + prefix + raw). Returns the persisted entity.
     async fn create(
         &self,
         name: &str,
         key_prefix: &str,
         key_hash: &str,
+        key_raw: &str,
     ) -> Result<ApiToken, DomainError>;
 
     /// List all tokens (without raw keys — only prefix and metadata).
@@ -24,6 +25,16 @@ pub trait ApiTokenRepository: Send + Sync {
     /// Find a token by name (for duplicate detection).
     async fn get_by_name(&self, name: &str) -> Result<Option<ApiToken>, DomainError>;
 
+    /// Update a token's name and optionally its key.
+    async fn update(
+        &self,
+        id: i64,
+        name: &str,
+        key_prefix: Option<&str>,
+        key_hash: Option<&str>,
+        key_raw: Option<&str>,
+    ) -> Result<ApiToken, DomainError>;
+
     /// Delete a token by ID (revocation).
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
 
@@ -33,4 +44,7 @@ pub trait ApiTokenRepository: Send + Sync {
     /// Get all token hashes for validation lookup.
     /// Returns `(id, key_hash)` pairs for efficient matching.
     async fn get_all_hashes(&self) -> Result<Vec<(i64, String)>, DomainError>;
+
+    /// Find a token ID by its SHA-256 hash (indexed lookup).
+    async fn get_id_by_hash(&self, key_hash: &str) -> Result<Option<i64>, DomainError>;
 }

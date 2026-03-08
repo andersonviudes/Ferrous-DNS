@@ -16,26 +16,18 @@ impl ValidateApiTokenUseCase {
         Self { repo }
     }
 
-    /// Validates the raw token by hashing it and comparing against stored hashes.
+    /// Validates the raw token by hashing it and looking up the hash in the database.
     /// Returns `Ok(token_id)` on match, `Err(InvalidCredentials)` otherwise.
     #[instrument(skip(self, raw_token))]
     pub async fn execute(&self, raw_token: &str) -> Result<i64, DomainError> {
         let incoming_hash = super::hash_token(raw_token);
-        let all_hashes = self.repo.get_all_hashes().await?;
 
-        for (id, stored_hash) in &all_hashes {
-            if timing_safe_eq(incoming_hash.as_bytes(), stored_hash.as_bytes()) {
-                self.repo.update_last_used(*id).await?;
-                return Ok(*id);
+        match self.repo.get_id_by_hash(&incoming_hash).await? {
+            Some(id) => {
+                self.repo.update_last_used(id).await?;
+                Ok(id)
             }
+            None => Err(DomainError::InvalidCredentials),
         }
-
-        Err(DomainError::InvalidCredentials)
     }
-}
-
-/// Constant-time comparison to prevent timing attacks on token validation.
-fn timing_safe_eq(a: &[u8], b: &[u8]) -> bool {
-    use subtle::ConstantTimeEq;
-    a.ct_eq(b).into()
 }
