@@ -28,8 +28,7 @@ fn should_return_prohibited_when_rate_limited() {
 #[test]
 fn should_return_dnssec_bogus_when_validation_failed() {
     let ede =
-        ede::from_domain_error(&DomainError::DnssecValidationFailed("sig expired".into()))
-            .unwrap();
+        ede::from_domain_error(&DomainError::DnssecValidationFailed("sig expired".into())).unwrap();
     assert_eq!(ede.info_code, codes::DNSSEC_BOGUS);
 }
 
@@ -96,9 +95,7 @@ fn should_return_none_when_unrelated_error() {
 
 #[test]
 fn should_return_none_when_filtered_query() {
-    assert!(
-        ede::from_domain_error(&DomainError::FilteredQuery("private PTR".into())).is_none()
-    );
+    assert!(ede::from_domain_error(&DomainError::FilteredQuery("private PTR".into())).is_none());
 }
 
 #[test]
